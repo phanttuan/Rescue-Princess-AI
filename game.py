@@ -142,53 +142,21 @@ def load_animation_frames():
         ghost_frame = [ghost_img]
 
 def load_scoreboard():
-    if os.path.exists("scoreboard.txt"):
-        with open("scoreboard.txt", "r") as file:
-            scores = []
-            for line in file:
-                parts = line.strip().split(",")
-                if len(parts) >= 2:
-                    if len(parts) == 2:
-                        scores.append([parts[0], parts[1], "0"])
-                    else:
-                        scores.append(parts)
-            return scores
-    return []
-
-def save_scoreboard(scores):
-    with open("scoreboard.txt", "a") as file:
-        for score, time, rescued in scores:
-            file.write(f"{score},{time},{rescued}\n")
-
-def save_high_score(steps, time, map_name, algorithm=None, difficulty=None):
-    high_scores_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "high_scores.txt")
-    try:
-        if algorithm and difficulty:
-            map_name = f"{map_name}_{algorithm}_{difficulty}"
-        with open(high_scores_file, "a") as file:
-            file.write(f"{map_name},{steps},{time}\n")
-    except Exception as e:
-        print(f"Lỗi khi lưu điểm cao: {e}")
-
-def load_high_scores():
-    high_scores = {}
-    high_scores_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "high_scores.txt")
-    
-    if not os.path.exists(high_scores_file):
-        return high_scores
-        
-    try:
-        with open(high_scores_file, "r") as file:
+    player_scores_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "player_scores.txt")
+    scores = []
+    if os.path.exists(player_scores_file):
+        with open(player_scores_file, "r") as file:
             for line in file:
                 parts = line.strip().split(",")
                 if len(parts) >= 3:
-                    map_name, steps, time = parts[0], int(parts[1]), int(parts[2])
-                    if map_name not in high_scores or steps < high_scores[map_name][0]:
-                        high_scores[map_name] = (steps, time)
-    except Exception as e:
-        print(f"Lỗi khi đọc điểm cao: {e}")
-        
-    return high_scores
+                    map_name = parts[0]
+                    steps = parts[1]
+                    time = parts[2]
+                    rescued = "1" if len(parts) > 3 and parts[3] == "1" else "0"
+                    difficulty = parts[4] if len(parts) > 4 else "EASY"
+                    scores.append([steps, time, rescued, map_name, difficulty]) 
+    return scores
+
 
 def bfs(maze, start, end):
     queue = deque([start])
@@ -1229,12 +1197,18 @@ def draw_end_screen(result, score, time, scoreboard, map_name):
         s, t = score_entry[0], score_entry[1]
         rescued = "Yes" if len(score_entry) > 2 and score_entry[2] == "1" else "No"
         rescued_color = GOLD_LIGHT if rescued == "Yes" else (200, 50, 50)
+        
+        # Thêm thông tin map và độ khó
+        score_map = score_entry[3] if len(score_entry) > 3 else "Unknown"
+        difficulty = score_entry[4] if len(score_entry) > 4 else "EASY"
+        diff_color = GOLD_LIGHT if difficulty == "HARD" else (100, 255, 100)
 
         entry_bg = pygame.Rect(leaderboard_container.x + 10, leaderboard_container.y + 10 + i * 55, 
                               leaderboard_container.width - 40, 50)
         pygame.draw.rect(screen, (45, 45, 55) if i % 2 == 0 else (35, 35, 45), entry_bg, border_radius=7)
         pygame.draw.rect(screen, (60, 60, 70), entry_bg, 1, border_radius=7)
 
+        # Icon hiển thị trạng thái cứu công chúa
         icon_rect = pygame.Rect(entry_bg.x + 10, entry_bg.y + 10, 30, 30)
         if rescued == "Yes":
             pygame.draw.rect(screen, (0, 150, 0), icon_rect, border_radius=5)
@@ -1245,11 +1219,24 @@ def draw_end_screen(result, score, time, scoreboard, map_name):
             x_mark = button_font.render("X", True, WHITE)
             screen.blit(x_mark, (icon_rect.x + 8, icon_rect.y + 2))
 
-        pos_text = button_font.render(f"{i + scroll_offset + 1}.", True, WHITE)
-        screen.blit(pos_text, (entry_bg.x + 50, entry_bg.y + 14))
+        # Vị trí trong bảng
+        pos_text = font.render(f"{i + scroll_offset + 1}.", True, WHITE)
+        screen.blit(pos_text, (entry_bg.x + 50, entry_bg.y + 8))
 
-        score_line = button_font.render(f"Steps: {s}, Time: {t}s", True, WHITE)
-        screen.blit(score_line, (entry_bg.x + 90, entry_bg.y + 14))
+        # Map và độ khó
+        map_text = font.render(score_map, True, WHITE)
+        screen.blit(map_text, (entry_bg.x + 70, entry_bg.y + 8))
+
+        # Độ khó
+        diff_text = font.render(difficulty, True, diff_color)
+        screen.blit(diff_text, (entry_bg.x + 70, entry_bg.y + 28))
+
+        # Số bước và thời gian
+        steps_text = font.render(f"Steps: {s}", True, WHITE)
+        screen.blit(steps_text, (entry_bg.x + 280, entry_bg.y + 8))
+
+        time_text = font.render(f"Time: {t}s", True, WHITE)
+        screen.blit(time_text, (entry_bg.x + 280, entry_bg.y + 28))
 
     if len(sorted_scores) > max_visible:
         scrollbar_bg = pygame.Rect(leaderboard_container.right - 25, leaderboard_container.y + 5, 
@@ -1622,7 +1609,6 @@ def load_maps_from_file():
                         current_name = None
             if current_map and current_name:
                 maps[current_name] = current_map
-        print(f"Đã tải {len(maps)} map từ file maps.txt.")
     except Exception as e:
         print(f"Lỗi khi tải maps: {e}")
     return maps
@@ -1731,11 +1717,12 @@ def save_all_maps_to_file():
     except Exception as e:
         print(f"Lỗi khi lưu maps: {e}")
 
-def save_player_score(steps, time, map_name):
+def save_player_score(steps, time, map_name, rescued=True, difficulty="EASY"):
     player_scores_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "player_scores.txt")
     try:
+        rescued_value = "1" if rescued else "0"
         with open(player_scores_file, "a") as file:
-            file.write(f"{map_name},{steps},{time}\n")
+            file.write(f"{map_name},{steps},{time},{rescued_value},{difficulty}\n")
     except Exception as e:
         print(f"Lỗi khi lưu điểm người chơi: {e}")
 
@@ -1770,7 +1757,6 @@ def main():
     load_animation_frames()
     maps = load_maps_from_file()
     scoreboard = load_scoreboard()
-    high_scores = load_high_scores()
     
     # Khởi tạo trạng thái game
     map_selection = False
@@ -2251,11 +2237,9 @@ def main():
                         draw_ai_victory_screen(selected_algorithm, ai_steps, elapsed_time, current_map_name, "HARD" if hard_mode else "EASY", 1)
                         save_ai_score(current_map_name, selected_algorithm, "HARD" if hard_mode else "EASY", ai_steps, elapsed_time, 1)
                     else:
-                        scoreboard.append([str(steps), str(elapsed_time), "1"])
-                        save_scoreboard([[str(steps), str(elapsed_time), "1"]])
-                        save_player_score(steps, elapsed_time, current_map_name)
+                        save_player_score(steps, elapsed_time, current_map_name, True, "HARD" if hard_mode else "EASY")
+                        scoreboard = load_scoreboard()
                         draw_end_screen("Victory!", steps, elapsed_time, scoreboard, current_map_name)
-
                     game_active = False
                     waiting_for_restart = True
                     
@@ -2271,10 +2255,9 @@ def main():
                         waiting_for_restart = True
                         save_ai_score(current_map_name, selected_algorithm, "HARD" if hard_mode else "EASY", steps, elapsed_time, 0)
                     else:
-                        rescued_status = "1" if princess_rescued else "0"
-                        scoreboard.append([str(steps), str(elapsed_time), rescued_status])
-                        save_scoreboard([[steps, elapsed_time, rescued_status]])
-                        save_player_score(steps, elapsed_time, current_map_name)
+                        rescued = princess_rescued
+                        save_player_score(steps, elapsed_time, current_map_name, rescued, "HARD" if hard_mode else "EASY")
+                        scoreboard = load_scoreboard()
                         draw_end_screen("Defeat!", steps, elapsed_time, scoreboard, current_map_name)
                         game_active = False
                         waiting_for_restart = True

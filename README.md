@@ -78,7 +78,7 @@ python main.py
 
 - **File bản đồ:** Tất cả bản đồ nằm trong `maps.txt`.
 - **Cấu trúc:** Mỗi bản đồ gồm tên (dòng đầu), tiếp theo là 16 dòng ma trận 16x16 (1: tường, 0: đường đi, 2: công chúa, 3: cửa thoát).
-- **Thêm bản đồ:** Thêm tên bản đồ mới và ma trận vào cuối file.
+- **Thêm bản đồ:** Thêm tên bản đồ mới và ma trận vào cuối file 'maps.txt'.
 
 ---
 
