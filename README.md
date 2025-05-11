@@ -1,9 +1,9 @@
 # Rescue-Princess-AI
 Đồ án cuối kì môn Trí tuệ nhân tạo Trường Đại học Sư phạm kỹ thuật TP. HCM 
-Nhóm sinh viên thực hiện:
-23110225	Nguyễn Lâm Huy
-23110278	Bùi Phúc Nhân
-23110355	Phan Việt Tuấn
+**Nhóm sinh viên thực hiện:**
+23110225 - Nguyễn Lâm Huy
+23110278 - Bùi Phúc Nhân
+23110355 - Phan Việt Tuấn
 
 # Rescue the Princess
 
@@ -67,10 +67,10 @@ python main.py
 
 ## Chế độ AI & Thống kê
 
-- **Chọn AI:** Tại menu chính, chọn "AI MODE" và thuật toán mong muốn.
+- **Chọn AI:** Tại menu chính, chọn "AI PLAY" và thuật toán mong muốn.
 - **Thống kê AI:** Nhấn nút "AI STATS" ở menu chính để xem thống kê chi tiết:
-  - Thuật toán, độ khó, số lần chơi, số bước trung bình, thời gian trung bình, số lần thắng/thua, tỉ lệ thắng, số lần giải cứu công chúa thành công.
-- **Lưu điểm:** Kết quả AI lưu ở `ai_score.txt`, người chơi lưu ở `high_scores.txt`.
+  - Thuật toán, số lần chơi, số bước trung bình, thời gian trung bình, có cứu được công chúa hay không.
+- **Lưu điểm:** Kết quả AI lưu ở `ai_score.txt`, người chơi lưu ở `player_scores.txt`.
 
 ---
 
@@ -92,7 +92,7 @@ Rescue-Princess/
 ├── game.py              # Logic chính của game
 ├── ui.py                # Giao diện và menu
 ├── maps.txt             # Danh sách bản đồ mê cung
-├── high_scores.txt      # Bảng điểm người chơi
+├── player_scores.txt      # Bảng điểm người chơi
 ├── ai_score.txt         # Thống kê AI
 ├── assets/              # Hình ảnh, âm thanh (nếu có)
 └── README.md            # Tài liệu này
