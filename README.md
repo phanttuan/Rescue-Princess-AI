@@ -86,16 +86,14 @@ python main.py
 
 ```
 Rescue-Princess/
-│
-├── main.py              # File khởi động game
-├── ai.py                # Thuật toán AI
-├── game.py              # Logic chính của game
-├── ui.py                # Giao diện và menu
+│           # Thuật toán AI
+├── game.py              # Khởi chạy game
 ├── maps.txt             # Danh sách bản đồ mê cung
 ├── player_scores.txt      # Bảng điểm người chơi
-├── ai_score.txt         # Thống kê AI
-├── assets/              # Hình ảnh, âm thanh (nếu có)
-└── README.md            # Tài liệu này
+├── ai_score.txt         # Bảng điểm AI
+├── images              # Hình ảnh
+├── sounds              # Âm thanh
+└── README.md            # Giới thiệu
 ```
 
 ---
