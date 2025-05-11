@@ -144,13 +144,21 @@ def load_animation_frames():
 def load_scoreboard():
     if os.path.exists("scoreboard.txt"):
         with open("scoreboard.txt", "r") as file:
-            return [line.strip().split(",") for line in file]
+            scores = []
+            for line in file:
+                parts = line.strip().split(",")
+                if len(parts) >= 2:
+                    if len(parts) == 2:
+                        scores.append([parts[0], parts[1], "0"])
+                    else:
+                        scores.append(parts)
+            return scores
     return []
 
 def save_scoreboard(scores):
     with open("scoreboard.txt", "a") as file:
-        for score, time in scores:
-            file.write(f"{score},{time}\n")
+        for score, time, rescued in scores:
+            file.write(f"{score},{time},{rescued}\n")
 
 def save_high_score(steps, time, map_name, algorithm=None, difficulty=None):
     high_scores_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "high_scores.txt")
@@ -483,7 +491,6 @@ def bfs_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge
     
     if player_pos == princess_pos and not knowledge["princess_rescued"]:
         knowledge["princess_rescued"] = True
-        # Reset path when princess is rescued
         knowledge["path"] = []
         knowledge["current_path_index"] = 0
     
@@ -558,6 +565,7 @@ def astar_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowled
     if path and len(path) > 0:
         return path[0], knowledge
     else:
+        # Nếu không tìm được đường đi, tìm các ô có thể di chuyển
         possible_moves = []
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             new_pos = (player_pos[0] + dx, player_pos[1] + dy)
@@ -566,8 +574,9 @@ def astar_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowled
         
         if possible_moves:
             return random.choice(possible_moves), knowledge
-    
-    return player_pos, knowledge
+        
+        # Nếu không có bước đi nào khả thi, đứng yên
+        return player_pos, knowledge
 
 # A* Search với Manhattan Distance Heuristic
 def astar_search(maze, start, goal):
@@ -601,13 +610,19 @@ def astar_search(maze, start, goal):
                 continue
             
             tentative_g = g_score[current] + 1
-            
-            if neighbor not in [item[1] for item in open_set] or tentative_g < g_score.get(neighbor, float('inf')):
+
+            in_open_set = False
+            for _, node in open_set:
+                if node == neighbor:
+                    in_open_set = True
+                    break
+                    
+            if not in_open_set or tentative_g < g_score.get(neighbor, float('inf')):
                 parent[neighbor] = current
                 g_score[neighbor] = tentative_g
                 f_score[neighbor] = g_score[neighbor] + manhattan_distance(neighbor, goal)
                 
-                if neighbor not in [item[1] for item in open_set]:
+                if not in_open_set:
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
     
     return []
@@ -678,7 +693,7 @@ def hill_climbing_algorithm(maze, player_pos, princess_pos, target_pos, visible,
 
 # Partially Observable 
 def partially_observable_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
-    # Initialize knowledge
+    # Khởi tạo kiến thức
     if knowledge is None:
         knowledge = {
             "maze": [[None for _ in range(COLS)] for _ in range(ROWS)],
@@ -756,7 +771,6 @@ def partially_observable_algorithm(maze, player_pos, princess_pos, target_pos, v
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             new_pos = (player_pos[0] + dx, player_pos[1] + dy)
             if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS:
-                # Skip known walls
                 if knowledge["maze"][new_pos[0]][new_pos[1]] == 1:
                     continue
                 
@@ -791,7 +805,7 @@ def partially_observable_algorithm(maze, player_pos, princess_pos, target_pos, v
     
     return next_move, knowledge
 
-# Min-Conflicts Algorithm - Constraint Satisfaction Approach
+# Min-Conflicts Algorithm - Constraint Satisfaction Problems
 def min_conflicts_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
     if knowledge is None:
         knowledge = {
@@ -883,11 +897,11 @@ def min_conflicts_algorithm(maze, player_pos, princess_pos, target_pos, visible,
     
     return next_move, knowledge
 
-# Q-Learning Algorithm - Reinforcement Learning Approach
+# Q-Learning Algorithm - Reinforcement Learning
 def q_learning_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
     if knowledge is None:
         knowledge = {
-            "q_table": {},  # State-action values
+            "q_table": {},
             "maze": [[None for _ in range(COLS)] for _ in range(ROWS)],
             "visited": set(),
             "princess_found": False,
@@ -906,10 +920,10 @@ def q_learning_algorithm(maze, player_pos, princess_pos, target_pos, visible, kn
         for col in range(COLS):
             if visible[row][col]:
                 knowledge["maze"][row][col] = maze[row][col]
-                if maze[row][col] == 2:  # Princess
+                if maze[row][col] == 2:
                     knowledge["princess_found"] = True
                     knowledge["princess_pos"] = (row, col)
-                elif maze[row][col] == 3:  # Exit
+                elif maze[row][col] == 3:
                     knowledge["exit_found"] = True
                     knowledge["exit_pos"] = (row, col)
     
@@ -1051,17 +1065,136 @@ def draw_ai_victory_screen(algorithm, steps, time, map_name, difficulty, rescued
     screen.blit(restart_text, (panel_rect.centerx - restart_text.get_width()//2, panel_rect.bottom - 40))
     pygame.display.flip()
 
+def draw_ai_stats_screen():
+    screen.blit(background_img, (0, 0))
+
+    draw_animated_title("AI Statistics", HEIGHT//5)
+
+    panel_rect = pygame.Rect(WIDTH//2 - 480, HEIGHT//2 - 250, 960, 500)
+    pygame.draw.rect(screen, PANEL_COLOR, panel_rect, border_radius=15)
+    glow_time = pygame.time.get_ticks() * 0.001
+    glow_intensity = int(127 + 128 * math.sin(glow_time))
+    glow_color = (glow_intensity, glow_intensity//2, 0)
+    pygame.draw.rect(screen, glow_color, panel_rect, 4, border_radius=15)
+
+    ai_score_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_score.txt")
+    ai_stats = []
+    unique_entries = set()
+
+    if os.path.exists(ai_score_file):
+        with open(ai_score_file, "r") as file:
+            for line in file:
+                parts = line.strip().split(",")
+                if len(parts) == 6:
+                    map_name, algo, diff, steps, time, rescued = parts
+
+                    entry_id = f"{map_name},{algo},{diff},{rescued}"
+                    if entry_id in unique_entries:
+                        continue
+                    unique_entries.add(entry_id)
+                    ai_stats.append({
+                        "map": map_name,
+                        "algo": algo,
+                        "steps": int(steps),
+                        "time": int(time),
+                        "rescued": rescued == "1"
+                    })
+
+                    ai_stats.sort(key=lambda x: (x["steps"], x["time"]))
+    
+    def sort_key(x):
+        return (x["algo"], x["map"])
+    
+    ai_stats.sort(key=sort_key)
+
+    stats_title = button_font.render("AI PERFORMANCE", True, GOLD_LIGHT)
+    screen.blit(stats_title, (panel_rect.centerx - stats_title.get_width()//2, panel_rect.y + 25))
+
+    table_container = pygame.Rect(panel_rect.x + 30, panel_rect.y + 80, panel_rect.width - 60, 340)
+    pygame.draw.rect(screen, (25, 25, 30), table_container, border_radius=10)
+    pygame.draw.rect(screen, GOLD_DARK, table_container, 2, border_radius=10)
+
+    header_bg = pygame.Rect(table_container.x + 10, table_container.y + 10, table_container.width - 20, 50)
+    pygame.draw.rect(screen, (60, 60, 80), header_bg, border_radius=7)
+    pygame.draw.rect(screen, GOLD_DARK, header_bg, 1, border_radius=7)
+
+    column_widths = [280, 250, 100, 100, 120]
+    column_names = ["Map", "Algorithm", "Steps", "Time", "Rescued"]
+    header_x = header_bg.x + 20
+    
+    for i, (name, width) in enumerate(zip(column_names, column_widths)):
+        header_text = font.render(name, True, GOLD_LIGHT)
+        screen.blit(header_text, (header_x, header_bg.y + 18))
+        header_x += width
+
+    max_visible = 5
+    scroll_offset = min(len(ai_stats) - max_visible, max(0, getattr(draw_ai_stats_screen, 'scroll_offset', 0)))
+    draw_ai_stats_screen.scroll_offset = scroll_offset
+
+    visible_stats = ai_stats[scroll_offset:scroll_offset + max_visible]
+    for i, stat in enumerate(visible_stats):
+        row_bg = pygame.Rect(table_container.x + 10, table_container.y + 65 + i * 52, 
+                           table_container.width - 20, 48)
+        pygame.draw.rect(screen, (45, 45, 55) if i % 2 == 0 else (35, 35, 45), row_bg, border_radius=7)
+        pygame.draw.rect(screen, (60, 60, 70), row_bg, 1, border_radius=7)
+
+        rescued_rect = pygame.Rect(row_bg.right - 60, row_bg.y + 9, 30, 30)
+        if stat["rescued"]:
+            pygame.draw.rect(screen, (0, 150, 0), rescued_rect, border_radius=5)
+            check = font.render("V", True, WHITE)
+            screen.blit(check, (rescued_rect.x + 8, rescued_rect.y + 5))
+        else:
+            pygame.draw.rect(screen, (150, 0, 0), rescued_rect, border_radius=5)
+            x_mark = font.render("X", True, WHITE)
+            screen.blit(x_mark, (rescued_rect.x + 8, rescued_rect.y + 5))
+
+        col_x = row_bg.x + 20
+        col_data = [stat["map"], stat["algo"], str(stat["steps"]), str(stat["time"])]
+        
+        for j, (data, width) in enumerate(zip(col_data, column_widths[:-1])):
+            text = font.render(data, True, WHITE)
+            screen.blit(text, (col_x, row_bg.y + 16))
+            col_x += width
+
+    if len(ai_stats) > max_visible:
+        scrollbar_bg = pygame.Rect(table_container.right - 25, table_container.y + 65, 
+                                 18, table_container.height - 75)
+        pygame.draw.rect(screen, (60, 60, 70), scrollbar_bg, border_radius=9)
+        
+        thumb_height = max(30, int(max_visible / len(ai_stats) * scrollbar_bg.height))
+        max_scroll = len(ai_stats) - max_visible
+        scroll_progress = scroll_offset / max_scroll if max_scroll > 0 else 0
+        thumb_pos = scrollbar_bg.y + (scrollbar_bg.height - thumb_height) * scroll_progress
+        
+        thumb = pygame.Rect(scrollbar_bg.x, thumb_pos, scrollbar_bg.width, thumb_height)
+        pygame.draw.rect(screen, GOLD_DARK, thumb, border_radius=9)
+        
+        glow_intensity = int(127 + 128 * math.sin(pygame.time.get_ticks() * 0.002))
+        pygame.draw.rect(screen, (glow_intensity, glow_intensity//2, 0), thumb, 2, border_radius=9)
+    
+    back_button = pygame.Rect(panel_rect.centerx - 100, panel_rect.bottom - 60, 200, 50)
+    draw_beautiful_button(back_button, "BACK", button_font)
+
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_DOWN] and scroll_offset < len(ai_stats) - max_visible:
+        draw_ai_stats_screen.scroll_offset = scroll_offset + 1
+    if keys[pygame.K_UP] and scroll_offset > 0:
+        draw_ai_stats_screen.scroll_offset = scroll_offset - 1
+
+    pygame.display.flip()
+    return back_button
+
 def draw_end_screen(result, score, time, scoreboard, map_name):
     screen.blit(background_img, (0, 0))
 
     draw_animated_title(result, HEIGHT//5)
 
-    panel_rect = pygame.Rect(WIDTH//2 - 300, HEIGHT//2 - 200, 600, 400)
+    panel_rect = pygame.Rect(WIDTH//2 - 350, HEIGHT//2 - 230, 700, 460)
     pygame.draw.rect(screen, PANEL_COLOR, panel_rect, border_radius=15)
     glow_time = pygame.time.get_ticks() * 0.001
     glow_intensity = int(127 + 128 * math.sin(glow_time))
     glow_color = (glow_intensity, glow_intensity//2, 0)
-    pygame.draw.rect(screen, glow_color, panel_rect, 3, border_radius=15)
+    pygame.draw.rect(screen, glow_color, panel_rect, 4, border_radius=15)
 
     current_game_title = font.render("YOUR RESULT", True, GOLD_LIGHT)
     map_name_text = font.render(f"Map: {map_name}", True, WHITE)
@@ -1069,21 +1202,78 @@ def draw_end_screen(result, score, time, scoreboard, map_name):
     time_text = font.render(f"Time: {time}s", True, WHITE)
     restart_text = font.render("Press SPACE to Restart", True, GOLD_LIGHT)
 
-    screen.blit(current_game_title, (panel_rect.centerx - current_game_title.get_width()//2, panel_rect.y + 20))
-    screen.blit(map_name_text, (panel_rect.centerx - map_name_text.get_width()//2, panel_rect.y + 60))
-    screen.blit(score_text, (panel_rect.centerx - score_text.get_width()//2, panel_rect.y + 90))
-    screen.blit(time_text, (panel_rect.centerx - time_text.get_width()//2, panel_rect.y + 120))
+    screen.blit(current_game_title, (panel_rect.centerx - current_game_title.get_width()//2, panel_rect.y + 25))
+    screen.blit(map_name_text, (panel_rect.centerx - map_name_text.get_width()//2, panel_rect.y + 65))
+    screen.blit(score_text, (panel_rect.centerx - score_text.get_width()//2, panel_rect.y + 95))
+    screen.blit(time_text, (panel_rect.centerx - time_text.get_width()//2, panel_rect.y + 125))
 
-    sb_title = font.render("LEADERBOARD", True, GOLD_LIGHT)
-    screen.blit(sb_title, (panel_rect.centerx - sb_title.get_width()//2, panel_rect.y + 160))
- 
-    sorted_scores = sorted(scoreboard, key=lambda x: int(x[0]))[:5]
+    sb_title = button_font.render("LEADERBOARD", True, GOLD_LIGHT)
+    screen.blit(sb_title, (panel_rect.centerx - sb_title.get_width()//2, panel_rect.y + 170))
 
-    for i, (s, t) in enumerate(sorted_scores[:5]):
-        score_entry = font.render(f"{i+1}. Steps: {s}, Time: {t}s", True, WHITE)
-        screen.blit(score_entry, (panel_rect.centerx - score_entry.get_width()//2, panel_rect.y + 190 + i * 30))
+    leaderboard_container = pygame.Rect(panel_rect.x + 30, panel_rect.y + 215, panel_rect.width - 60, 180)
+    pygame.draw.rect(screen, (25, 25, 30), leaderboard_container, border_radius=10)
+    pygame.draw.rect(screen, GOLD_DARK, leaderboard_container, 2, border_radius=10)
+
+    valid_scores = [x for x in scoreboard if x[0].strip()]
+    try:
+        sorted_scores = sorted(valid_scores, key=lambda x: (0 if len(x) > 2 and x[2] == "1" else 1, int(x[0])))
+    except (ValueError, IndexError):
+        sorted_scores = []
+
+    max_visible = 3
+    scroll_offset = min(len(sorted_scores) - max_visible, max(0, getattr(draw_end_screen, 'scroll_offset', 0)))
+    draw_end_screen.scroll_offset = scroll_offset
+
+    visible_scores = sorted_scores[scroll_offset:scroll_offset + max_visible]
+    for i, score_entry in enumerate(visible_scores):
+        s, t = score_entry[0], score_entry[1]
+        rescued = "Yes" if len(score_entry) > 2 and score_entry[2] == "1" else "No"
+        rescued_color = GOLD_LIGHT if rescued == "Yes" else (200, 50, 50)
+
+        entry_bg = pygame.Rect(leaderboard_container.x + 10, leaderboard_container.y + 10 + i * 55, 
+                              leaderboard_container.width - 40, 50)
+        pygame.draw.rect(screen, (45, 45, 55) if i % 2 == 0 else (35, 35, 45), entry_bg, border_radius=7)
+        pygame.draw.rect(screen, (60, 60, 70), entry_bg, 1, border_radius=7)
+
+        icon_rect = pygame.Rect(entry_bg.x + 10, entry_bg.y + 10, 30, 30)
+        if rescued == "Yes":
+            pygame.draw.rect(screen, (0, 150, 0), icon_rect, border_radius=5)
+            check = button_font.render("V", True, WHITE)
+            screen.blit(check, (icon_rect.x + 8, icon_rect.y + 2))
+        else:
+            pygame.draw.rect(screen, (150, 0, 0), icon_rect, border_radius=5)
+            x_mark = button_font.render("X", True, WHITE)
+            screen.blit(x_mark, (icon_rect.x + 8, icon_rect.y + 2))
+
+        pos_text = button_font.render(f"{i + scroll_offset + 1}.", True, WHITE)
+        screen.blit(pos_text, (entry_bg.x + 50, entry_bg.y + 14))
+
+        score_line = button_font.render(f"Steps: {s}, Time: {t}s", True, WHITE)
+        screen.blit(score_line, (entry_bg.x + 90, entry_bg.y + 14))
+
+    if len(sorted_scores) > max_visible:
+        scrollbar_bg = pygame.Rect(leaderboard_container.right - 25, leaderboard_container.y + 5, 
+                                 18, leaderboard_container.height - 10)
+        pygame.draw.rect(screen, (60, 60, 70), scrollbar_bg, border_radius=9)
+
+        thumb_height = max(30, int(max_visible / len(sorted_scores) * scrollbar_bg.height))
+        max_scroll = len(sorted_scores) - max_visible
+        scroll_progress = scroll_offset / max_scroll if max_scroll > 0 else 0
+        thumb_pos = scrollbar_bg.y + (scrollbar_bg.height - thumb_height) * scroll_progress
+        
+        thumb = pygame.Rect(scrollbar_bg.x, thumb_pos, scrollbar_bg.width, thumb_height)
+        pygame.draw.rect(screen, GOLD_DARK, thumb, border_radius=9)
+
+        glow_intensity = int(127 + 128 * math.sin(pygame.time.get_ticks() * 0.002))
+        pygame.draw.rect(screen, (glow_intensity, glow_intensity//2, 0), thumb, 2, border_radius=9)
 
     screen.blit(restart_text, (panel_rect.centerx - restart_text.get_width()//2, panel_rect.bottom - 40))
+
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_DOWN] and scroll_offset < len(sorted_scores) - max_visible:
+        draw_end_screen.scroll_offset = scroll_offset + 1
+    if keys[pygame.K_UP] and scroll_offset > 0:
+        draw_end_screen.scroll_offset = scroll_offset - 1
 
     pygame.display.flip()
 
@@ -1551,11 +1741,24 @@ def save_player_score(steps, time, map_name):
 
 def save_ai_score(map_name, algorithm, difficulty, steps, time, rescued):
     ai_score_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_score.txt")
-    try:
-        with open(ai_score_file, "a") as file:
-            file.write(f"{map_name},{algorithm},{difficulty},{steps},{time},{rescued}\n")
-    except Exception as e:
-        print(f"Lỗi khi lưu điểm AI: {e}")
+    
+    existing_entries = set()
+    if os.path.exists(ai_score_file):
+        with open(ai_score_file, "r") as file:
+            for line in file:
+                parts = line.strip().split(",")
+                if len(parts) == 6:
+                    entry_id = f"{parts[0]},{parts[1]},{parts[2]},{parts[5]}"
+                    existing_entries.add(entry_id)
+    
+    new_entry_id = f"{map_name},{algorithm},{difficulty},{rescued}"
+    
+    if new_entry_id not in existing_entries:
+        try:
+            with open(ai_score_file, "a") as file:
+                file.write(f"{map_name},{algorithm},{difficulty},{steps},{time},{rescued}\n")
+        except Exception as e:
+            print(f"Lỗi khi lưu điểm AI: {e}")
 
 def main():
     global maps, current_frame, animation_speed, WIDTH, HEIGHT, screen
@@ -1796,6 +1999,7 @@ def main():
                             algorithm_selection = False
                             game_active = True
                             ai_mode = True
+                            hard_mode = False
                             
                             if selected_algorithm == "BFS":
                                 ai_function = bfs_algorithm
@@ -2047,11 +2251,11 @@ def main():
                         draw_ai_victory_screen(selected_algorithm, ai_steps, elapsed_time, current_map_name, "HARD" if hard_mode else "EASY", 1)
                         save_ai_score(current_map_name, selected_algorithm, "HARD" if hard_mode else "EASY", ai_steps, elapsed_time, 1)
                     else:
-                        scoreboard.append([str(steps), str(elapsed_time)])
-                        save_scoreboard([[steps, elapsed_time]])
+                        scoreboard.append([str(steps), str(elapsed_time), "1"])
+                        save_scoreboard([[str(steps), str(elapsed_time), "1"]])
                         save_player_score(steps, elapsed_time, current_map_name)
                         draw_end_screen("Victory!", steps, elapsed_time, scoreboard, current_map_name)
-                    
+
                     game_active = False
                     waiting_for_restart = True
                     
@@ -2067,14 +2271,18 @@ def main():
                         waiting_for_restart = True
                         save_ai_score(current_map_name, selected_algorithm, "HARD" if hard_mode else "EASY", steps, elapsed_time, 0)
                     else:
-                        scoreboard.append([str(steps), str(elapsed_time)])
-                        save_scoreboard([[steps, elapsed_time]])
+                        rescued_status = "1" if princess_rescued else "0"
+                        scoreboard.append([str(steps), str(elapsed_time), rescued_status])
+                        save_scoreboard([[steps, elapsed_time, rescued_status]])
                         save_player_score(steps, elapsed_time, current_map_name)
                         draw_end_screen("Defeat!", steps, elapsed_time, scoreboard, current_map_name)
                         game_active = False
                         waiting_for_restart = True
 
                 if not game_active and waiting_for_restart:
+                    # Store the game result to use in the event loop
+                    result_text = "Victory!" if princess_rescued and player_pos == target_pos else "Defeat!"
+                    
                     while waiting_for_restart:
                         for event in pygame.event.get():
                             if event.type == pygame.QUIT:
@@ -2085,40 +2293,18 @@ def main():
                                     waiting_for_restart = False
                                     in_main_menu = True
                                     break
+                                if event.key == pygame.K_DOWN:
+                                    if hasattr(draw_end_screen, 'scroll_offset'):
+                                        draw_end_screen.scroll_offset += 1
+                                    draw_end_screen(result_text, steps, elapsed_time, scoreboard, current_map_name)
+                                if event.key == pygame.K_UP:
+                                    if hasattr(draw_end_screen, 'scroll_offset'):
+                                        draw_end_screen.scroll_offset = max(0, draw_end_screen.scroll_offset - 1)
+                                    draw_end_screen(result_text, steps, elapsed_time, scoreboard, current_map_name)
                         pygame.time.delay(10)
         elif ai_stats_screen:
-            screen.blit(background_img, (0, 0))
-            draw_animated_title("AI Statistics", HEIGHT//8)
-            back_button = pygame.Rect(WIDTH//2 - 150, HEIGHT - 100, 300, 60)
-            draw_beautiful_button(back_button, "BACK", button_font)
-
-            ai_score_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_score.txt")
-            ai_stats = []
-            if os.path.exists(ai_score_file):
-                with open(ai_score_file, "r") as file:
-                    for line in file:
-                        parts = line.strip().split(",")
-                        if len(parts) == 6:
-                            map_name, algo, diff, steps, time, rescued = parts
-                            ai_stats.append({
-                                "map": map_name,
-                                "algo": algo,
-                                "diff": diff,
-                                "steps": int(steps),
-                                "time": int(time),
-                                "rescued": "Yes" if rescued == "1" else "No"
-                            })
-            def sort_key(x):
-                return (0 if x["diff"].upper() == "HARD" else 1, x["algo"], x["map"])
-            ai_stats.sort(key=sort_key)
-            header = font.render("Map | Algorithm | Difficulty | Steps | Time | Rescued", True, GOLD_LIGHT)
-            screen.blit(header, (WIDTH//2 - header.get_width()//2, HEIGHT//4 + 40))
-            y = HEIGHT//4 + 90
-            for row in ai_stats[:15]:
-                line = font.render(f"{row['map']:10} | {row['algo']:12} | {row['diff']:8} | {row['steps']:5} | {row['time']:5} | {row['rescued']:3}", True, WHITE)
-                screen.blit(line, (WIDTH//2 - line.get_width()//2, y))
-                y += 38
-            pygame.display.flip()
+            back_button = draw_ai_stats_screen()
+            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -2128,13 +2314,10 @@ def main():
                         button_sound.play()
                         ai_stats_screen = False
                         in_main_menu = True
-                        break
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         ai_stats_screen = False
                         in_main_menu = True
-                        break
-            pygame.time.delay(10)
         pygame.display.flip()
         pygame.time.delay(10)
     
