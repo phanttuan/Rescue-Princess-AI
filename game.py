@@ -617,6 +617,7 @@ def astar_search(maze, start, goal):
 
 def manhattan_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
 # NGUYỄN LÂM HUY
 #  Simple Hill Climbing Algorithm
 def simple_hill_climbing_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
@@ -2692,7 +2693,7 @@ def main():
                                                  monster_panel.centery - text_surface.get_height()//2))
                     else:
                         show_monster_notification = False
-
+                # thuật toán di chuyển quái vật tìm người chơi (BFS)
                 if ghost_pos and current_time - last_monster_move > monster_move_time:
                     target = princess_pos if princess_rescued else player_pos
                     path = bfs(maze, ghost_pos, target)

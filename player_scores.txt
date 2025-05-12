@@ -1,0 +1,4 @@
+Serpentine Challenge,39,55,0,EASY
+Treacherous Maze,59,15,0,HARD
+Serpentine Challenge,45,22,1,EASY
+Serpentine Challenge,43,12,1,HARD
