@@ -467,6 +467,7 @@ def draw_ai_algorithm_selection():
     back_hovered = draw_beautiful_button(back_button, "BACK", font, base_color=(70, 70, 70), hover_color=(100, 100, 100))
     pygame.display.flip()
     return algorithm_buttons, back_button, hover_states, back_hovered
+# PHAN VIỆT TUẤN
 # BFS 
 def bfs_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
     if knowledge is None:
@@ -616,7 +617,7 @@ def astar_search(maze, start, goal):
 
 def manhattan_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
-
+# NGUYỄN LÂM HUY
 #  Simple Hill Climbing Algorithm
 def simple_hill_climbing_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
     if knowledge is None:
@@ -941,6 +942,7 @@ def draw_po_visibility_selection():
     
     pygame.display.flip()
     return slider_rect, handle_rect, confirm_button, cancel_button, fog_checkbox_rect, visibility_value, fog_enabled
+# BÙI PHÚC NHÂN
 # Min-Conflicts Algorithm - Constraint Satisfaction Problems
 def min_conflicts_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
     if knowledge is None:
@@ -956,80 +958,102 @@ def min_conflicts_algorithm(maze, player_pos, princess_pos, target_pos, visible,
             "princess_rescued": False
         }
     
+    # Cập nhật kiến thức về bản đồ dựa trên vùng nhìn thấy
     for row in range(ROWS):
         for col in range(COLS):
             if visible[row][col]:
                 knowledge["maze"][row][col] = maze[row][col]
-                if maze[row][col] == 2:
+                if maze[row][col] == 2: # Tìm thấy công chúa
                     knowledge["princess_found"] = True
                     knowledge["princess_pos"] = (row, col)
-                elif maze[row][col] == 3:
+                elif maze[row][col] == 3: # Tìm thấy cổng thoát
                     knowledge["exit_found"] = True
                     knowledge["exit_pos"] = (row, col)
 
+    # Kiểm tra nếu đã cứu công chúa
     if player_pos == princess_pos and not knowledge["princess_rescued"]:
         knowledge["princess_rescued"] = True
 
+    # Đánh dấu ô hiện tại đã được thăm
     knowledge["visited"].add(player_pos)
     
     neighbors = []
-    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-        new_pos = (player_pos[0] + dx, player_pos[1] + dy)
-        if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS and knowledge["maze"][new_pos[0]][new_pos[1]] != 1:
-            neighbors.append(new_pos)
+    knowledge["conflicts"] = {} # Reset conflicts cho mỗi bước để tính toán lại
 
+    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]: # Các hướng di chuyển có thể
+        new_pos = (player_pos[0] + dx, player_pos[1] + dy)
+        
+        # Kiểm tra xem ô mới có nằm trong bản đồ và không phải là tường đã biết
+        if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS and \
+           (knowledge["maze"][new_pos[0]][new_pos[1]] is None or knowledge["maze"][new_pos[0]][new_pos[1]] != 1):
+            
+            neighbors.append(new_pos)
             conflicts = 0
 
+            # Xung đột nếu ô đã được thăm
             if new_pos in knowledge["visited"]:
                 conflicts += 10
 
+            # Xung đột lớn nếu ô là ngõ cụt
             if new_pos in knowledge["deadends"]:
                 conflicts += 50
-
-            if knowledge["princess_found"] and not knowledge["princess_rescued"]:
-                dist_to_princess = manhattan_distance(new_pos, knowledge["princess_pos"])
-                conflicts -= 5 * (1 / (dist_to_princess + 1))
             
-            if knowledge["princess_rescued"] and knowledge["exit_found"]:
+            # Giảm xung đột nếu ô gần công chúa hơn (nếu đã tìm thấy và chưa cứu)
+            if knowledge["princess_found"] and not knowledge["princess_rescued"] and knowledge["princess_pos"]:
+                dist_to_princess = manhattan_distance(new_pos, knowledge["princess_pos"])
+                # Càng gần công chúa, điểm trừ càng lớn (xung đột càng thấp)
+                conflicts -= 20 * (1 / (dist_to_princess + 1)) 
+            
+            # Giảm xung đột nếu ô gần cổng thoát hơn (nếu đã cứu công chúa và tìm thấy cổng)
+            if knowledge["princess_rescued"] and knowledge["exit_found"] and knowledge["exit_pos"]:
                 dist_to_exit = manhattan_distance(new_pos, knowledge["exit_pos"])
-                conflicts -= 5 * (1 / (dist_to_exit + 1))
+                # Càng gần cổng thoát, điểm trừ càng lớn
+                conflicts -= 20 * (1 / (dist_to_exit + 1)) 
             
             knowledge["conflicts"][new_pos] = conflicts
     
     next_move = None
 
-    if knowledge["princess_found"] and not knowledge["princess_rescued"]:
-        temp_maze = [[1 if knowledge["maze"][r][c] == 1 else 0 for c in range(COLS)] for r in range(ROWS)]
-        for r in range(ROWS):
-            for c in range(COLS):
-                if knowledge["maze"][r][c] is None:
-                    temp_maze[r][c] = 0
+    # Chọn bước đi có xung đột thấp nhất
+    if neighbors:
+        # Sắp xếp các ô lân cận theo điểm xung đột tăng dần
+        # Ưu tiên các ô chưa được thăm nếu điểm xung đột bằng nhau
+        sorted_neighbors = sorted(neighbors, key=lambda pos: (knowledge["conflicts"].get(pos, float('inf')), pos in knowledge["visited"]))
+        if sorted_neighbors:
+            next_move = sorted_neighbors[0]
+
+    # Đánh dấu ngõ cụt: nếu chỉ có một lối đi và đó không phải là mục tiêu
+    # và vị trí hiện tại không phải là mục tiêu
+    if len(neighbors) == 1 and next_move:
+        is_current_goal = False
+        if knowledge["princess_found"] and not knowledge["princess_rescued"] and player_pos == knowledge["princess_pos"]:
+            is_current_goal = True
+        if knowledge["princess_rescued"] and knowledge["exit_found"] and player_pos == knowledge["exit_pos"]:
+            is_current_goal = True
         
-        path = astar_search(temp_maze, player_pos, knowledge["princess_pos"])
-        if path and len(path) > 0:
-            next_move = path[0]
+        if not is_current_goal:
+             # Nếu lối đi duy nhất là quay lại ô vừa đi qua, và ô đó không phải mục tiêu
+            if len(knowledge["visited"]) > 1 and neighbors[0] in knowledge["visited"]:
+                 # Kiểm tra xem có phải đang bị kẹt giữa 2 ô không
+                is_stuck = True
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    check_pos = (player_pos[0] + dx, player_pos[1] + dy)
+                    if 0 <= check_pos[0] < ROWS and 0 <= check_pos[1] < COLS and \
+                       (knowledge["maze"][check_pos[0]][check_pos[1]] is None or \
+                        knowledge["maze"][check_pos[0]][check_pos[1]] != 1) and \
+                       check_pos not in knowledge["deadends"] and check_pos != neighbors[0]:
+                        is_stuck = False
+                        break
+                if is_stuck:
+                    knowledge["deadends"].add(player_pos)
 
-    elif knowledge["princess_rescued"] and knowledge["exit_found"]:
-        temp_maze = [[1 if knowledge["maze"][r][c] == 1 else 0 for c in range(COLS)] for r in range(ROWS)]
-        for r in range(ROWS):
-            for c in range(COLS):
-                if knowledge["maze"][r][c] is None:
-                    temp_maze[r][c] = 0
-        
-        path = astar_search(temp_maze, player_pos, knowledge["exit_pos"])
-        if path and len(path) > 0:
-            next_move = path[0]
 
-    if next_move is None and neighbors:
-        next_move = min(neighbors, key=lambda pos: knowledge["conflicts"].get(pos, float('inf')))
-    
-    if len(neighbors) == 1 and player_pos != princess_pos and player_pos != target_pos:
-        knowledge["deadends"].add(player_pos)
-
-    if next_move is None and neighbors:
-        next_move = neighbors[0]
-    elif next_move is None:
-        next_move = player_pos
+    # Nếu không có bước đi nào được chọn (ví dụ: bị chặn hoàn toàn hoặc lỗi logic)
+    if next_move is None:
+        if neighbors: # Nếu vẫn còn ô lân cận, chọn đại một ô
+            next_move = random.choice(neighbors)
+        else: # Không còn đường đi, đứng yên
+            next_move = player_pos
     
     return next_move, knowledge
 
@@ -1038,8 +1062,8 @@ def q_learning_algorithm(maze, player_pos, princess_pos, target_pos, visible, kn
     if knowledge is None:
         knowledge = {
             "q_table": {},
-            "maze": [[None for _ in range(COLS)] for _ in range(ROWS)],
-            "visited": set(),
+            "maze": [[None for _ in range(COLS)] for _ in range(ROWS)], # Bản đồ AI biết
+            "visited_in_episode": set(), # Các ô đã thăm trong lượt chơi này (để tính reward khám phá)
             "princess_found": False,
             "exit_found": False,
             "princess_pos": None,
@@ -1047,116 +1071,154 @@ def q_learning_algorithm(maze, player_pos, princess_pos, target_pos, visible, kn
             "princess_rescued": False,
             "last_state": None,
             "last_action": None,
-            "learning_rate": 0.1,
-            "discount_factor": 0.9,
-            "exploration_rate": 0.3
+            "previous_player_pos": None, # Theo dõi vị trí ngay trước đó
+            "learning_rate": 0.1,      # Alpha
+            "discount_factor": 0.9,    # Gamma
+            "max_exploration_rate": 0.8, 
+            "min_exploration_rate": 0.01,
+            "exploration_decay_rate": 0.998, # Tốc độ giảm epsilon
         }
-    
+        knowledge["exploration_rate"] = knowledge["max_exploration_rate"]
+
+
+    # Cập nhật kiến thức về bản đồ dựa trên vùng nhìn thấy
     for row in range(ROWS):
         for col in range(COLS):
             if visible[row][col]:
                 knowledge["maze"][row][col] = maze[row][col]
-                if maze[row][col] == 2:
+                if maze[row][col] == 2: # Tìm thấy công chúa
                     knowledge["princess_found"] = True
                     knowledge["princess_pos"] = (row, col)
-                elif maze[row][col] == 3:
+                elif maze[row][col] == 3: # Tìm thấy cổng thoát
                     knowledge["exit_found"] = True
                     knowledge["exit_pos"] = (row, col)
     
-    if player_pos == princess_pos and not knowledge["princess_rescued"]:
+    # Kiểm tra nếu đã cứu công chúa
+    just_rescued_princess = False
+    if player_pos == knowledge.get("princess_pos") and knowledge["princess_found"] and not knowledge["princess_rescued"]:
         knowledge["princess_rescued"] = True
+        just_rescued_princess = True
+        knowledge["visited_in_episode"] = set() # QUAN TRỌNG: Reset để khuyến khích tìm đường ra mới
 
-    knowledge["visited"].add(player_pos)
+    # Trạng thái hiện tại
+    current_state = (player_pos, knowledge["princess_rescued"], knowledge["princess_found"], knowledge["exit_found"])
 
-    current_state = (player_pos, knowledge["princess_rescued"])
-
+    # Cập nhật Q-value từ bước trước (nếu có)
     if knowledge["last_state"] is not None and knowledge["last_action"] is not None:
         reward = 0
         
-        if knowledge["princess_rescued"] and not knowledge["last_state"][1]:
-            reward += 100
+        if just_rescued_princess:
+            reward += 200 # Phần thưởng lớn khi vừa cứu công chúa
+        
+        if knowledge["princess_rescued"] and player_pos == knowledge.get("exit_pos") and knowledge["exit_found"]:
+            reward += 300 # Phần thưởng lớn khi đến cổng thoát
 
-        if player_pos not in knowledge["visited"] - {player_pos}:
-            reward += 1
-
+        if 0 <= player_pos[0] < ROWS and 0 <= player_pos[1] < COLS:
+            if knowledge["maze"][player_pos[0]][player_pos[1]] == 1: # Đi vào tường
+                 reward -= 100 
+        
+        if player_pos not in knowledge["visited_in_episode"]:
+            reward += 10 # Phần thưởng khám phá ô mới
         else:
-            reward -= 0.5
+            reward -= 3 # Phạt đi lại ô đã thăm trong episode này
+        
+        # Phạt nặng hơn nếu quay lại ô ngay trước đó
+        if knowledge.get("previous_player_pos") and player_pos == knowledge["previous_player_pos"]:
+            reward -= 25 
+
+        # Phần thưởng/Phạt khi tiến gần/xa mục tiêu (TĂNG CƯỜNG)
+        if not knowledge["princess_rescued"] and knowledge["princess_found"] and knowledge["princess_pos"]:
+            dist_now = manhattan_distance(player_pos, knowledge["princess_pos"])
+            if knowledge["last_state"] and isinstance(knowledge["last_state"], tuple) and len(knowledge["last_state"]) > 0 and \
+               isinstance(knowledge["last_state"][0], tuple) and len(knowledge["last_state"][0]) == 2:
+                 prev_pos_for_dist_calc = knowledge["last_state"][0]
+                 dist_prev = manhattan_distance(prev_pos_for_dist_calc, knowledge["princess_pos"])
+                 if dist_now < dist_prev: reward += 15 # Tăng phần thưởng
+                 elif dist_now > dist_prev: reward -= 15 # Tăng hình phạt
+        elif knowledge["princess_rescued"] and knowledge["exit_found"] and knowledge["exit_pos"]:
+            dist_now = manhattan_distance(player_pos, knowledge["exit_pos"])
+            if knowledge["last_state"] and isinstance(knowledge["last_state"], tuple) and len(knowledge["last_state"]) > 0 and \
+               isinstance(knowledge["last_state"][0], tuple) and len(knowledge["last_state"][0]) == 2:
+                prev_pos_for_dist_calc = knowledge["last_state"][0]
+                dist_prev = manhattan_distance(prev_pos_for_dist_calc, knowledge["exit_pos"])
+                if dist_now < dist_prev: reward += 15 # Tăng phần thưởng
+                elif dist_now > dist_prev: reward -= 15 # Tăng hình phạt
 
         if knowledge["last_state"] not in knowledge["q_table"]:
             knowledge["q_table"][knowledge["last_state"]] = {}
         if knowledge["last_action"] not in knowledge["q_table"][knowledge["last_state"]]:
             knowledge["q_table"][knowledge["last_state"]][knowledge["last_action"]] = 0
 
-        max_q = 0
-        if current_state in knowledge["q_table"]:
-            q_values = knowledge["q_table"][current_state].values()
-            if q_values:
-                max_q = max(q_values)
+        max_future_q = 0
+        if current_state in knowledge["q_table"] and knowledge["q_table"][current_state]:
+            max_future_q = max(knowledge["q_table"][current_state].values())
+        
+        old_q_value = knowledge["q_table"][knowledge["last_state"]][knowledge["last_action"]]
+        knowledge["q_table"][knowledge["last_state"]][knowledge["last_action"]] = old_q_value + \
+            knowledge["learning_rate"] * (reward + knowledge["discount_factor"] * max_future_q - old_q_value)
 
-        knowledge["q_table"][knowledge["last_state"]][knowledge["last_action"]] += knowledge["learning_rate"] * (
-            reward + knowledge["discount_factor"] * max_q - 
-            knowledge["q_table"][knowledge["last_state"]][knowledge["last_action"]]
-        )
+    knowledge["visited_in_episode"].add(player_pos) # Thêm vị trí hiện tại vào tập đã thăm của episode này
 
-    actions = []
+    possible_actions = []
     for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
         new_pos = (player_pos[0] + dx, player_pos[1] + dy)
-        if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS and knowledge["maze"][new_pos[0]][new_pos[1]] != 1:
-            actions.append(new_pos)
+        if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS and \
+           (knowledge["maze"][new_pos[0]][new_pos[1]] is None or knowledge["maze"][new_pos[0]][new_pos[1]] != 1):
+            possible_actions.append(new_pos)
     
     next_move = None
 
-    if knowledge["princess_found"] and not knowledge["princess_rescued"]:
-        temp_maze = [[1 if knowledge["maze"][r][c] == 1 else 0 for c in range(COLS)] for r in range(ROWS)]
-        for r in range(ROWS):
-            for c in range(COLS):
-                if knowledge["maze"][r][c] is None:
-                    temp_maze[r][c] = 1
-        
-        path = astar_search(temp_maze, player_pos, knowledge["princess_pos"])
-        if path and len(path) > 0:
-            next_move = path[0]
-    
-    elif knowledge["princess_rescued"] and knowledge["exit_found"]:
-        temp_maze = [[1 if knowledge["maze"][r][c] == 1 else 0 for c in range(COLS)] for r in range(ROWS)]
-        for r in range(ROWS):
-            for c in range(COLS):
-                if knowledge["maze"][r][c] is None:
-                    temp_maze[r][c] = 1
-        
-        path = astar_search(temp_maze, player_pos, knowledge["exit_pos"])
-        if path and len(path) > 0:
-            next_move = path[0]
-
-    if next_move is None and actions:
+    if possible_actions:
         if current_state not in knowledge["q_table"]:
             knowledge["q_table"][current_state] = {}
 
         if random.random() < knowledge["exploration_rate"]:
-            next_move = random.choice(actions)
+            # Thăm dò: cố gắng không quay lại ô trước đó nếu có lựa chọn khác
+            non_previous_actions = [a for a in possible_actions if a != knowledge.get("previous_player_pos")]
+            if non_previous_actions:
+                next_move = random.choice(non_previous_actions)
+            else: # Nếu tất cả các hành động đều là quay lại (ví dụ: ngõ cụt)
+                next_move = random.choice(possible_actions)
         else:
-            best_q = float('-inf')
-            best_actions = []
+            # Khai thác: chọn hành động có Q-value cao nhất
+            best_q_value = float('-inf')
+            candidate_actions = [] # Các hành động có Q-value cao nhất
             
-            for action in actions:
+            for action in possible_actions:
                 q_value = knowledge["q_table"][current_state].get(action, 0)
-                if q_value > best_q:
-                    best_q = q_value
-                    best_actions = [action]
-                elif q_value == best_q:
-                    best_actions.append(action)
+                if q_value > best_q_value:
+                    best_q_value = q_value
+                    candidate_actions = [action]
+                elif q_value == best_q_value:
+                    candidate_actions.append(action)
+            
+            if candidate_actions:
+                # Từ các ứng viên tốt nhất, cố gắng chọn một hành động không phải là quay lui
+                preferred_actions = [a for a in candidate_actions if a != knowledge.get("previous_player_pos")]
+                if preferred_actions:
+                    next_move = random.choice(preferred_actions)
+                else: # Tất cả các hành động tốt nhất đều là quay lui, hoặc chỉ có một hành động tốt nhất là quay lui
+                    next_move = random.choice(candidate_actions) 
+            else: # Fallback nếu không có candidate_actions (không nên xảy ra nếu possible_actions có phần tử)
+                non_previous_actions = [a for a in possible_actions if a != knowledge.get("previous_player_pos")]
+                if non_previous_actions:
+                    next_move = random.choice(non_previous_actions)
+                else:
+                    next_move = random.choice(possible_actions)
+    
+    if next_move is None: 
+        if possible_actions:
+             next_move = random.choice(possible_actions) 
+        else:
+            next_move = player_pos # Đứng yên nếu bị kẹt hoàn toàn
 
-            next_move = random.choice(best_actions if best_actions else actions)
-
-    if next_move is None and actions:
-        next_move = random.choice(actions)
-    elif next_move is None:
-        next_move = player_pos
-
+    knowledge["previous_player_pos"] = player_pos # Lưu vị trí hiện tại làm vị trí trước đó cho lần gọi sau
+    
     knowledge["last_state"] = current_state
-    knowledge["last_action"] = next_move
+    knowledge["last_action"] = next_move 
 
-    knowledge["exploration_rate"] = max(0.05, knowledge["exploration_rate"] * 0.999)
+    knowledge["exploration_rate"] = max(knowledge["min_exploration_rate"], 
+                                        knowledge["exploration_rate"] * knowledge["exploration_decay_rate"])
     
     return next_move, knowledge
 
