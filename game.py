@@ -2725,7 +2725,6 @@ def main():
                         waiting_for_restart = True
 
                 if not game_active and waiting_for_restart:
-                    # Store the game result to use in the event loop
                     result_text = "Victory!" if princess_rescued and player_pos == target_pos else "Defeat!"
                     
                     while waiting_for_restart:
