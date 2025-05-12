@@ -193,9 +193,16 @@ def update_fog_effect():
             alpha = min(255, max(0, int(200 + wave * (dist / (CELL_SIZE / 2)))))
             fog_surface.set_at((x, y), (50, 50, 50, alpha))
 
-def draw_maze(maze, visible, offset_x, offset_y, player_pos, use_fog=True):
+def draw_maze(maze, visible, offset_x, offset_y, player_pos, use_fog=True, ai_mode=False, selected_algorithm=None, ai_knowledge=None):
     global fog_animation_time
     fog_animation_time += 0.05  # Tăng thời gian để tạo hiệu ứng động nhẹ
+
+    # Kiểm tra xem AI có đang sử dụng thuật toán PO không
+    is_po_algorithm = ai_mode and selected_algorithm == "Partially Observable"
+    
+    # Nếu đang sử dụng thuật toán PO, lấy cài đặt sương mù từ ai_knowledge
+    if is_po_algorithm and ai_knowledge:
+        use_fog = ai_knowledge.get("fog_enabled", True)
 
     for row in range(ROWS):
         for col in range(COLS):
@@ -204,30 +211,43 @@ def draw_maze(maze, visible, offset_x, offset_y, player_pos, use_fog=True):
             
             # Kiểm tra nếu ô nằm trong vùng hiển thị của màn hình
             if 0 <= screen_x < WIDTH and 0 <= screen_y < HEIGHT:
-                if use_fog:
-                    # Phiên bản có sương mù
-                    if visible[row][col]:
-                        if maze[row][col] == 1:
-                            screen.blit(wall_img, (screen_x, screen_y))
-                        else:
-                            screen.blit(floor_img, (screen_x, screen_y))
-                    else:
-                        # Tính khoảng cách từ người chơi để điều chỉnh độ mờ
-                        distance = math.sqrt((row - player_pos[0]) ** 2 + (col - player_pos[1]) ** 2)
-                        fog_alpha = min(255, max(100, int(255 * (distance / VIEW_RADIUS))))
-                        
-                        # Tạo hiệu ứng động nhẹ
-                        pulse = int(math.sin(fog_animation_time) * 10 + 245)
-                        animated_fog = fog_surface.copy()
-                        animated_fog.fill((50, 50, 50, fog_alpha), special_flags=pygame.BLEND_RGBA_MULT)
-                        
-                        screen.blit(animated_fog, (screen_x, screen_y))
-                else:
-                    # Phiên bản không có sương mù - hiển thị toàn bộ map
+                # Phần 1: Vẽ các ô có thể nhìn thấy
+                if visible[row][col]:
+                    # Vẽ nền (sàn hoặc tường)
                     if maze[row][col] == 1:
                         screen.blit(wall_img, (screen_x, screen_y))
                     else:
                         screen.blit(floor_img, (screen_x, screen_y))
+                
+                # Phần 2: Vẽ sương mù cho các ô không nhìn thấy
+                elif use_fog:
+                    # Tính khoảng cách từ người chơi để điều chỉnh độ mờ
+                    distance = math.sqrt((row - player_pos[0]) ** 2 + (col - player_pos[1]) ** 2)
+                    fog_alpha = min(255, max(100, int(255 * (distance / VIEW_RADIUS))))
+                    
+                    # Tạo hiệu ứng động nhẹ
+                    pulse = int(math.sin(fog_animation_time) * 10 + 245)
+                    animated_fog = fog_surface.copy()
+                    animated_fog.fill((50, 50, 50, fog_alpha), special_flags=pygame.BLEND_RGBA_MULT)
+                    
+                    screen.blit(animated_fog, (screen_x, screen_y))
+                
+                # Phần 3: Nếu không sử dụng sương mù, vẽ dấu hỏi hoặc ô thông thường
+                else:
+                    # Chế độ hiển thị khi không có sương mù
+                    if is_po_algorithm:
+                        # Trong chế độ PO không sương mù, vẽ dấu ? cho các ô chưa khám phá
+                        screen.blit(floor_img, (screen_x, screen_y))
+                        question_mark = font.render("?", True, (100, 100, 100))
+                        screen.blit(question_mark, (screen_x + CELL_SIZE//2 - question_mark.get_width()//2, 
+                                                  screen_y + CELL_SIZE//2 - question_mark.get_height()//2))
+                    else:
+                        # Trong chế độ thông thường không sương mù, hiển thị toàn bộ map
+                        if maze[row][col] == 1:
+                            screen.blit(wall_img, (screen_x, screen_y))
+                        else:
+                            screen.blit(floor_img, (screen_x, screen_y))
+
 def draw_entities(player_pos, princess_pos, ghost_pos, target_pos, visible, offset_x, offset_y):
     global current_frame
     
@@ -673,9 +693,63 @@ def partially_observable_algorithm(maze, player_pos, princess_pos, target_pos, v
             "princess_pos": None,
             "exit_pos": None,
             "princess_rescued": False,
-            "exploration_bias": 0.3
+            "exploration_bias": 0.3,
+            "visibility_percentage": 50,  # Mặc định 50%
+            "fog_enabled": True           # Mặc định bật sương mù
         }
     
+    # Reset ma trận visible dựa vào tỷ lệ nhìn thấy
+    reset_visible = True
+    
+    # Nếu không bật fog, hiển thị toàn bộ bản đồ
+    if not knowledge.get("fog_enabled", True):
+        for row in range(ROWS):
+            for col in range(COLS):
+                visible[row][col] = True
+        reset_visible = False
+    
+    # Nếu reset_visible vẫn là True, thì thiết lập lại ma trận visible
+    if reset_visible:
+        # Đầu tiên đặt tất cả các ô về False
+        for row in range(ROWS):
+            for col in range(COLS):
+                visible[row][col] = False
+        
+        # Luôn hiển thị khu vực xung quanh người chơi
+        for dr in range(-VIEW_RADIUS, VIEW_RADIUS+1):
+            for dc in range(-VIEW_RADIUS, VIEW_RADIUS+1):
+                r, c = player_pos[0] + dr, player_pos[1] + dc
+                if 0 <= r < ROWS and 0 <= c < COLS:
+                    distance = math.sqrt(dr*dr + dc*dc)
+                    if distance <= VIEW_RADIUS:
+                        visible[r][c] = True
+        
+        # Tính số ô có thể nhìn thấy dựa vào visibility_percentage
+        total_cells = ROWS * COLS
+        visible_cells_count = int((knowledge.get("visibility_percentage", 50) / 100) * total_cells)
+        current_visible = sum(sum(row) for row in visible)
+        
+        
+        # Thêm các ô ngẫu nhiên nếu chưa đủ số ô cần hiển thị
+        if current_visible < visible_cells_count:
+            cells_to_add = visible_cells_count - current_visible
+            
+            # Tạo danh sách các ô chưa nhìn thấy
+            invisible_cells = [(r, c) for r in range(ROWS) for c in range(COLS) if not visible[r][c]]
+            
+            # Nếu cần thêm các ô nhìn thấy và còn ô chưa nhìn thấy
+            if cells_to_add > 0 and invisible_cells:
+                # Chọn ngẫu nhiên các ô để hiển thị
+                random.shuffle(invisible_cells)
+                for i in range(min(cells_to_add, len(invisible_cells))):
+                    r, c = invisible_cells[i]
+                    visible[r][c] = True
+        
+        # Thống kê sau khi cập nhật
+        updated_visible = sum(sum(row) for row in visible)
+        print(f"Updated visible cells: {updated_visible}")
+    
+    # Cập nhật kiến thức dựa trên vùng nhìn thấy
     for row in range(ROWS):
         for col in range(COLS):
             if visible[row][col]:
@@ -693,6 +767,7 @@ def partially_observable_algorithm(maze, player_pos, princess_pos, target_pos, v
                     knowledge["exit_found"] = True
                     knowledge["exit_pos"] = (row, col)
     
+    # Cập nhật tập biên (frontier) - các ô đã biết giáp với ô chưa khám phá
     knowledge["frontier"] = set()
     for row in range(ROWS):
         for col in range(COLS):
@@ -703,76 +778,169 @@ def partially_observable_algorithm(maze, player_pos, princess_pos, target_pos, v
                         knowledge["frontier"].add((row, col))
                         break
 
+    # Cập nhật trạng thái công chúa
     if player_pos == princess_pos and not knowledge["princess_rescued"]:
         knowledge["princess_rescued"] = True
 
+    # Thêm vị trí hiện tại vào tập đã thăm
     knowledge["visited"].add(player_pos)
     
     next_move = None
 
+    # Phase 1: Nếu đã tìm thấy công chúa và chưa giải cứu, di chuyển đến công chúa
     if knowledge["princess_found"] and not knowledge["princess_rescued"]:
+        # Tạo bản đồ tạm để tìm đường đi
         temp_maze = [[1 if knowledge["maze"][r][c] == 1 else 0 for c in range(COLS)] for r in range(ROWS)]
         for r in range(ROWS):
             for c in range(COLS):
+                # Coi các ô chưa khám phá là tường để tránh
                 if knowledge["maze"][r][c] is None:
                     temp_maze[r][c] = 1
         
+        # Tìm đường đi đến công chúa bằng A*
         path = astar_search(temp_maze, player_pos, knowledge["princess_pos"])
         if path and len(path) > 0:
             next_move = path[0]
 
+    # Phase 2: Nếu đã giải cứu công chúa và đã tìm thấy cổng thoát, di chuyển đến cổng
     elif knowledge["princess_rescued"] and knowledge["exit_found"]:
         temp_maze = [[1 if knowledge["maze"][r][c] == 1 else 0 for c in range(COLS)] for r in range(ROWS)]
         for r in range(ROWS):
             for c in range(COLS):
+                # Coi các ô chưa khám phá là tường để tránh
                 if knowledge["maze"][r][c] is None:
                     temp_maze[r][c] = 1
         
+        # Tìm đường đi đến cổng thoát bằng A*
         path = astar_search(temp_maze, player_pos, knowledge["exit_pos"])
         if path and len(path) > 0:
             next_move = path[0]
     
+    # Phase 3: Nếu chưa có hướng đi cụ thể, khám phá dựa trên độ hữu ích của mỗi ô
     if next_move is None:
         possible_moves = []
         move_utilities = {}
         
+        # Đánh giá độ hữu ích của các ô lân cận
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             new_pos = (player_pos[0] + dx, player_pos[1] + dy)
             if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS:
+                # Bỏ qua các ô đã biết là tường
                 if knowledge["maze"][new_pos[0]][new_pos[1]] == 1:
                     continue
                 
                 utility = 0
                 
+                # Điểm cho ô nằm ở biên - có thể dẫn đến ô chưa khám phá
                 if new_pos in knowledge["frontier"]:
                     utility += (1 - knowledge["exploration_bias"]) * 10
                 
+                # Điểm cho ô chưa khám phá
                 if knowledge["maze"][new_pos[0]][new_pos[1]] is None:
-                    utility += knowledge["exploration_bias"] * 10
+                    utility += knowledge["exploration_bias"] * 15
                 
+                # Điểm cho ô chưa từng thăm
                 if new_pos not in knowledge["visited"]:
-                    utility += 5
+                    utility += 8
 
+                # Thêm yếu tố ngẫu nhiên nhỏ để tránh bị kẹt
                 utility += random.random()
                 
+                # Lưu lại ô và độ hữu ích của nó
                 possible_moves.append(new_pos)
                 move_utilities[new_pos] = utility
 
+        # Chọn ô có độ hữu ích cao nhất
         if possible_moves:
             next_move = max(possible_moves, key=lambda pos: move_utilities[pos])
-
+    
+    # Phase 4: Nếu không có hướng đi khả thi, chọn ngẫu nhiên một ô lân cận không phải tường
     if next_move is None:
         possible_moves = []
         for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             new_pos = (player_pos[0] + dx, player_pos[1] + dy)
-            if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS and knowledge["maze"][new_pos[0]][new_pos[1]] != 1:
-                possible_moves.append(new_pos)
+            if 0 <= new_pos[0] < ROWS and 0 <= new_pos[1] < COLS:
+                # Nếu biết là tường thì bỏ qua, nếu không biết hoặc biết không phải tường thì thêm vào
+                if knowledge["maze"][new_pos[0]][new_pos[1]] != 1:
+                    possible_moves.append(new_pos)
         
         if possible_moves:
             next_move = random.choice(possible_moves)
+        else:  # Không có bước đi khả thi, đứng yên
+            next_move = player_pos
     
     return next_move, knowledge
 
+def draw_po_visibility_selection():
+    """Hiển thị cửa sổ chọn tầm nhìn cho thuật toán PO"""
+    
+    # Lưu màn hình hiện tại để làm nền mờ
+    background = screen.copy()
+    
+    # Tạo lớp mờ
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))  # Màu đen với độ trong suốt
+    screen.blit(overlay, (0, 0))
+    
+    # Vẽ panel chính
+    panel_width, panel_height = 500, 300
+    panel_rect = pygame.Rect(WIDTH//2 - panel_width//2, HEIGHT//2 - panel_height//2, 
+                           panel_width, panel_height)
+    pygame.draw.rect(screen, PANEL_COLOR, panel_rect, border_radius=15)
+    pygame.draw.rect(screen, GOLD_DARK, panel_rect, 3, border_radius=15)
+    
+    # Tiêu đề
+    title_text = button_font.render("Partially Observable Settings", True, GOLD_LIGHT)
+    screen.blit(title_text, (panel_rect.centerx - title_text.get_width()//2, panel_rect.y + 20))
+    
+    # Chữ hướng dẫn
+    instruction_text = font.render("Select visibility percentage:", True, WHITE)
+    screen.blit(instruction_text, (panel_rect.centerx - instruction_text.get_width()//2, panel_rect.y + 80))
+    
+    # Vẽ thanh trượt
+    slider_width, slider_height = 350, 8
+    slider_rect = pygame.Rect(panel_rect.centerx - slider_width//2, panel_rect.y + 130, 
+                            slider_width, slider_height)
+    pygame.draw.rect(screen, (60, 60, 70), slider_rect, border_radius=4)
+    
+    # Giá trị và vị trí hiện tại của trượt
+    visibility_value = getattr(draw_po_visibility_selection, 'visibility_value', 50)
+    draw_po_visibility_selection.visibility_value = visibility_value
+    
+    slider_position = slider_rect.x + int((visibility_value / 100) * slider_width)
+    handle_rect = pygame.Rect(slider_position - 7, slider_rect.y - 11, 14, 30)
+    glow_intensity = int(127 + 128 * math.sin(pygame.time.get_ticks() * 0.004))
+    glow_color = (glow_intensity, glow_intensity//2, 0)
+    
+    pygame.draw.rect(screen, GOLD_DARK, handle_rect, border_radius=7)
+    pygame.draw.rect(screen, glow_color, handle_rect, 2, border_radius=7)
+    
+    # Hiển thị giá trị
+    value_text = button_font.render(f"{visibility_value}%", True, GOLD_LIGHT)
+    screen.blit(value_text, (panel_rect.centerx - value_text.get_width()//2, slider_rect.y + 30))
+    
+    # Nút xác nhận và hủy
+    confirm_button = pygame.Rect(panel_rect.centerx - 140, panel_rect.y + 200, 120, 50)
+    cancel_button = pygame.Rect(panel_rect.centerx + 20, panel_rect.y + 200, 120, 50)
+    
+    confirm_hovered = draw_beautiful_button(confirm_button, "CONFIRM", font, base_color=(50, 150, 50))
+    cancel_hovered = draw_beautiful_button(cancel_button, "CANCEL", font, base_color=(150, 50, 50))
+    
+    # Thêm tùy chọn sương mù
+    fog_enabled = getattr(draw_po_visibility_selection, 'fog_enabled', True)
+    draw_po_visibility_selection.fog_enabled = fog_enabled
+    
+    fog_checkbox_rect = pygame.Rect(panel_rect.centerx - 100, panel_rect.y + 170, 20, 20)
+    pygame.draw.rect(screen, (60, 60, 70), fog_checkbox_rect, border_radius=3)
+    if fog_enabled:
+        pygame.draw.rect(screen, GOLD_LIGHT, fog_checkbox_rect, border_radius=3)
+    pygame.draw.rect(screen, WHITE, fog_checkbox_rect, 1, border_radius=3)
+    
+    fog_text = font.render("Enable fog of war", True, WHITE)
+    screen.blit(fog_text, (panel_rect.centerx - 70, panel_rect.y + 170))
+    
+    pygame.display.flip()
+    return slider_rect, handle_rect, confirm_button, cancel_button, fog_checkbox_rect, visibility_value, fog_enabled
 # Min-Conflicts Algorithm - Constraint Satisfaction Problems
 def min_conflicts_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
     if knowledge is None:
@@ -1292,7 +1460,7 @@ def draw_game_tutorial():
     pygame.display.flip()
     return back_button
 
-def create_map_editor():
+def create_map_editor(existing_map=None, map_name=None):
     """Tính năng tạo map bằng cách kéo thả."""
     global WIDTH, HEIGHT, screen, maps
     old_width, old_height = WIDTH, HEIGHT
@@ -1301,7 +1469,18 @@ def create_map_editor():
 
     # Khởi tạo biến
     map_size = 16
-    editing_map = [[0 for _ in range(map_size)] for _ in range(map_size)]
+    
+    # Nếu có map hiện có, sử dụng nó. Nếu không, tạo map mới
+    if existing_map:
+        editing_map = [row[:] for row in existing_map]  # Copy map hiện có
+        original_map = [row[:] for row in existing_map]  # Lưu bản sao để so sánh thay đổi
+    else:
+        editing_map = [[0 for _ in range(map_size)] for _ in range(map_size)]
+        original_map = [[0 for _ in range(map_size)] for _ in range(map_size)]
+    
+    # Biến để kiểm tra xem map đã được thay đổi chưa
+    map_changed = False
+
     EDITOR_SIZE = 600
     EDITOR_X = 50
     EDITOR_Y = 100
@@ -1324,16 +1503,22 @@ def create_map_editor():
     selected_tool = None
     running = True
     input_active = False
-    input_text = ""
+    input_text = map_name if map_name else ""
     error_message = ""
     error_time = 0
     created_map = None
+    
+    # Biến theo dõi thời gian double click
+    last_click_time = 0
+    last_click_pos = None
+    double_click_delay = 300  # milliseconds
 
     while running:
         screen.fill((30, 30, 40))
 
         # Vẽ tiêu đề
-        draw_animated_title("Map Editor", 30)
+        mode_title = "Edit Map: " + map_name if map_name else "Create New Map"
+        draw_animated_title(mode_title, 30)
 
         # Vẽ khung chứa map
         editor_rect = pygame.Rect(EDITOR_X-10, EDITOR_Y-10, 
@@ -1366,6 +1551,10 @@ def create_map_editor():
         panel_title = font.render("Tools", True, GOLD_LIGHT)
         screen.blit(panel_title, (panel_rect.centerx - panel_title.get_width()//2, 70))
 
+        # Vẽ hướng dẫn double click
+        hint_text = font.render("Double click to clear a cell", True, WHITE)
+        screen.blit(hint_text, (panel_rect.centerx - hint_text.get_width()//2, panel_rect.bottom - 220))
+
         spacing = 60
         start_y = 120
         for i, (tool_name, tool_img) in enumerate(tools.items()):
@@ -1396,6 +1585,22 @@ def create_map_editor():
         # Xử lý sự kiện
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                # Hiển thị cảnh báo nếu có thay đổi chưa lưu
+                if map_changed:
+                    confirmation = show_unsaved_changes_warning()
+                    if confirmation == "SAVE":
+                        # Lưu thay đổi trước khi thoát
+                        if map_name:
+                            success = save_map_to_file(editing_map, map_name, overwrite=True)
+                            if success:
+                                maps[map_name] = editing_map.copy()
+                                created_map = editing_map.copy()
+                        else:
+                            # Yêu cầu đặt tên trước khi lưu
+                            input_active = True
+                            continue
+                    elif confirmation == "CANCEL":
+                        continue
                 pygame.quit()
                 sys.exit()
 
@@ -1426,7 +1631,7 @@ def create_map_editor():
                     elif cancel_button.collidepoint(event.pos):
                         button_sound.play()
                         input_active = False
-                        input_text = ""
+                        input_text = map_name if map_name else ""
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         if input_text.strip():
@@ -1454,6 +1659,7 @@ def create_map_editor():
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
+                current_time = pygame.time.get_ticks()
 
                 # Xử lý click vào công cụ
                 spacing = 60
@@ -1474,29 +1680,94 @@ def create_map_editor():
                                 error_message = "Map phải có cả công chúa và cổng thoát!"
                                 error_time = pygame.time.get_ticks()
                             else:
-                                input_active = True
-                                input_text = ""
+                                if map_name:  # Nếu đã có tên (đang edit map)
+                                    success = save_map_to_file(editing_map, map_name, overwrite=True)
+                                    if success:
+                                        maps[map_name] = editing_map.copy()
+                                        created_map = editing_map.copy()
+                                        map_changed = False  # Reset trạng thái thay đổi sau khi lưu
+                                        running = False
+                                    else:
+                                        error_message = "Lỗi khi lưu map!"
+                                        error_time = pygame.time.get_ticks()
+                                else:  # Map mới, cần nhập tên
+                                    input_active = True
+                                    input_text = ""
                         elif text == "BACK":
-                            running = False
+                            if map_changed:
+                                # Hiển thị cảnh báo khi có thay đổi chưa lưu
+                                confirmation = show_unsaved_changes_warning()
+                                if confirmation == "SAVE":
+                                    if map_name:  # Nếu đã có tên (đang edit map)
+                                        success = save_map_to_file(editing_map, map_name, overwrite=True)
+                                        if success:
+                                            maps[map_name] = editing_map.copy()
+                                            created_map = editing_map.copy()
+                                            running = False
+                                        else:
+                                            error_message = "Lỗi khi lưu map!"
+                                            error_time = pygame.time.get_ticks()
+                                            continue  # Không thoát nếu lưu không thành công
+                                    else:  # Map mới, cần nhập tên
+                                        input_active = True
+                                        input_text = ""
+                                        continue  # Không thoát cho đến khi lưu
+                                elif confirmation == "DISCARD":
+                                    running = False
+                                # Nếu CANCEL, không làm gì cả và tiếp tục edit
+                            else:
+                                running = False
 
+                # Xử lý click vào map
                 if EDITOR_X <= x < EDITOR_X + EDITOR_SIZE and EDITOR_Y <= y < EDITOR_Y + EDITOR_SIZE:
                     col = (x - EDITOR_X) // CELL_SIZE_EDITOR
                     row = (y - EDITOR_Y) // CELL_SIZE_EDITOR
-                    if selected_tool:
+                    
+                    # Giá trị hiện tại của ô trước khi thay đổi
+                    current_cell_value = editing_map[row][col]
+                    
+                    # Kiểm tra double click
+                    is_double_click = False
+                    if last_click_pos and last_click_pos == (row, col) and current_time - last_click_time < double_click_delay:
+                        # Double click - xóa ô
+                        if editing_map[row][col] != 0:
+                            editing_map[row][col] = 0
+                            map_changed = True  # Đánh dấu map đã thay đổi
+                        is_double_click = True
+                    
+                    # Cập nhật thời gian click và vị trí
+                    last_click_time = current_time
+                    last_click_pos = (row, col)
+                    
+                    # Nếu không phải double click và đã chọn công cụ, đặt vật thể
+                    if not is_double_click and selected_tool:
+                        new_value = None
                         if selected_tool == "Wall":
-                            editing_map[row][col] = 1
+                            new_value = 1
                         elif selected_tool == "Princess":
+                            # Xóa công chúa cũ nếu có
                             for r in range(map_size):
                                 for c in range(map_size):
                                     if editing_map[r][c] == 2:
                                         editing_map[r][c] = 0
-                            editing_map[row][col] = 2
+                            new_value = 2
                         elif selected_tool == "Exit":
+                            # Xóa cổng thoát cũ nếu có
                             for r in range(map_size):
                                 for c in range(map_size):
                                     if editing_map[r][c] == 3:
                                         editing_map[r][c] = 0
-                            editing_map[row][col] = 3
+                            new_value = 3
+                            
+                        # Chỉ đánh dấu thay đổi nếu giá trị thực sự thay đổi
+                        if new_value is not None and current_cell_value != new_value:
+                            editing_map[row][col] = new_value
+                            map_changed = True
+
+        # Kiểm tra xem map có thay đổi so với bản gốc không (cho trường hợp edit map có sẵn)
+        if not map_changed and existing_map:
+            map_changed = not all(original_map[i][j] == editing_map[i][j] 
+                               for i in range(map_size) for j in range(map_size))
 
         # Vẽ hộp thoại nhập tên map
         if input_active:
@@ -1531,6 +1802,70 @@ def create_map_editor():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     return created_map
 
+def show_unsaved_changes_warning():
+    """Hiển thị cảnh báo khi có thay đổi chưa lưu."""
+    original_screen = screen.copy()
+    
+    # Tạo lớp overlay mờ
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))  # Màu đen với độ trong suốt
+    screen.blit(overlay, (0, 0))
+    
+    # Vẽ hộp thoại xác nhận
+    dialog_width, dialog_height = 500, 220
+    dialog_rect = pygame.Rect(WIDTH//2 - dialog_width//2, HEIGHT//2 - dialog_height//2,
+                            dialog_width, dialog_height)
+    pygame.draw.rect(screen, PANEL_COLOR, dialog_rect, border_radius=15)
+    pygame.draw.rect(screen, (200, 50, 50), dialog_rect, 3, border_radius=15)
+    
+    # Tiêu đề và nội dung
+    title = button_font.render("UNSAVED CHANGES", True, (255, 100, 100))
+    message = font.render("You have unsaved changes. What do you want to do?", True, WHITE)
+    
+    screen.blit(title, (dialog_rect.centerx - title.get_width()//2, dialog_rect.y + 30))
+    screen.blit(message, (dialog_rect.centerx - message.get_width()//2, dialog_rect.y + 80))
+    
+    # Các nút
+    save_button = pygame.Rect(dialog_rect.x + 30, dialog_rect.bottom - 70, 140, 50)
+    discard_button = pygame.Rect(dialog_rect.centerx - 70, dialog_rect.bottom - 70, 140, 50)
+    cancel_button = pygame.Rect(dialog_rect.right - 170, dialog_rect.bottom - 70, 140, 50)
+    
+    result = None
+    
+    # Loop cho hộp thoại xác nhận
+    while result is None:
+        save_hovered = draw_beautiful_button(save_button, "SAVE", font, base_color=(50, 150, 50))
+        discard_hovered = draw_beautiful_button(discard_button, "DISCARD", font, base_color=(150, 50, 50))
+        cancel_hovered = draw_beautiful_button(cancel_button, "CANCEL", font)
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if save_button.collidepoint(event.pos):
+                    button_sound.play()
+                    result = "SAVE"
+                elif discard_button.collidepoint(event.pos):
+                    button_sound.play()
+                    result = "DISCARD"
+                elif cancel_button.collidepoint(event.pos):
+                    button_sound.play()
+                    result = "CANCEL"
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    result = "CANCEL"
+        
+        pygame.display.flip()
+        pygame.time.delay(10)
+    
+    # Khôi phục màn hình gốc nếu hủy
+    if result == "CANCEL":
+        screen.blit(original_screen, (0, 0))
+        pygame.display.flip()
+    
+    return result
+
 def gradient_rect(surface, rect, color1, color2):
     """Vẽ hình chữ nhật với màu gradient."""
     for i in range(rect.height):
@@ -1560,17 +1895,56 @@ def draw_gradient_button(rect, text, font,
     text_rect = text_surface.get_rect(center=rect.center)
     screen.blit(text_surface, text_rect)
 
-def save_map_to_file(map_data, map_name):
+def save_map_to_file(map_data, map_name, overwrite=False):
     """Lưu map vào file maps.txt với tên map."""
     try:
         file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maps.txt")
         print(f"Đang lưu map '{map_name}' vào: {file_path}")
         
-        with open(file_path, "a") as file:
-            file.write(f"{map_name}\n")
-            for row in map_data:
-                file.write(",".join(map(str, row)) + "\n")
-            file.write("\n")
+        if overwrite:
+            # Đọc tất cả các map hiện tại
+            maps_data = {}
+            if os.path.exists(file_path):
+                with open(file_path, "r") as file:
+                    lines = file.readlines()
+                    current_map = []
+                    current_name = None
+                    for line in lines:
+                        line = line.strip()
+                        if not line:
+                            if current_map and current_name:
+                                maps_data[current_name] = current_map
+                                current_map = []
+                                current_name = None
+                        elif current_name is None:
+                            current_name = line
+                        else:
+                            try:
+                                current_map.append(line)
+                            except:
+                                current_map = []
+                                current_name = None
+                    if current_map and current_name:
+                        maps_data[current_name] = current_map
+            
+            # Cập nhật map cần ghi đè
+            maps_data[map_name] = [",".join(map(str, row)) for row in map_data]
+            
+            # Ghi lại tất cả các map
+            with open(file_path, "w") as file:
+                for name, map_rows in maps_data.items():
+                    file.write(f"{name}\n")
+                    for row in map_rows:
+                        file.write(f"{row}\n")
+                    file.write("\n")
+            
+        else:
+            # Thêm map mới vào cuối file
+            with open(file_path, "a") as file:
+                file.write(f"{map_name}\n")
+                for row in map_data:
+                    file.write(",".join(map(str, row)) + "\n")
+                file.write("\n")
         
         print(f"Đã lưu map '{map_name}' thành công!")
         return True
@@ -1794,7 +2168,7 @@ def main():
                         custom_map = create_map_editor()
                         if custom_map:
                             maps = load_maps_from_file()
-                        
+                    #Manage maps
                     elif manage_maps_button.collidepoint(event.pos):
                         button_sound.play()
                         manage_maps = True
@@ -1822,10 +2196,12 @@ def main():
                                         for button, map_name in edit_buttons:
                                             if button.collidepoint(event.pos):
                                                 button_sound.play()
-                                                custom_map = create_map_editor()
+                                                # Lấy map hiện tại để chỉnh sửa
+                                                current_map = maps[map_name]
+                                                # Gọi map editor với map hiện có và tên map
+                                                custom_map = create_map_editor(existing_map=current_map, map_name=map_name)
                                                 if custom_map:
-                                                    maps[map_name] = custom_map
-                                                    save_all_maps_to_file()
+                                                    maps = load_maps_from_file()
                                                 break
                                     if event.type == pygame.MOUSEWHEEL:
                                         if event.y < 0 and scroll_offset < max(0, len(maps)-max_visible):
@@ -1982,10 +2358,74 @@ def main():
                         if button.collidepoint(event.pos):
                             button_sound.play()
                             selected_algorithm = algo_name
+                            
+                             # Nếu chọn PO, hiển thị popup cài đặt
+                            if selected_algorithm == "Partially Observable":
+                                # Lưu màn hình hiện tại
+                                screen_backup = screen.copy()
+                                
+                                # Khởi tạo giá trị mặc định
+                                po_settings_done = False
+                                draw_po_visibility_selection.visibility_value = 50
+                                draw_po_visibility_selection.fog_enabled = True
+                                
+                                while not po_settings_done:
+                                    slider_rect, handle_rect, confirm_button, cancel_button, fog_checkbox_rect, visibility_value, fog_enabled = draw_po_visibility_selection()
+                                    
+                                    for event in pygame.event.get():
+                                        if event.type == pygame.QUIT:
+                                            pygame.quit()
+                                            sys.exit()
+                                            
+                                        if event.type == pygame.MOUSEBUTTONDOWN:
+                                            if confirm_button.collidepoint(event.pos):
+                                                button_sound.play()
+                                                po_visibility = visibility_value
+                                                po_fog_enabled = fog_enabled
+                                                po_settings_done = True
+                                                
+                                            elif cancel_button.collidepoint(event.pos):
+                                                button_sound.play()
+                                                # Hủy và quay lại màn hình chọn thuật toán
+                                                screen.blit(screen_backup, (0, 0))
+                                                pygame.display.flip()
+                                                break
+                                                
+                                            elif fog_checkbox_rect.collidepoint(event.pos):
+                                                button_sound.play()
+                                                draw_po_visibility_selection.fog_enabled = not fog_enabled
+                                                
+                                            elif slider_rect.collidepoint(event.pos) or handle_rect.collidepoint(event.pos):
+                                                # Bắt đầu kéo thanh trượt
+                                                dragging = True
+                                                while dragging:
+                                                    for event in pygame.event.get():
+                                                        if event.type == pygame.MOUSEBUTTONUP:
+                                                            dragging = False
+                                                        if event.type == pygame.MOUSEMOTION:
+                                                            x_pos = max(slider_rect.x, min(slider_rect.right, event.pos[0]))
+                                                            percentage = int((x_pos - slider_rect.x) / slider_rect.width * 100)
+                                                            draw_po_visibility_selection.visibility_value = percentage
+                                                            # Vẽ lại popup với giá trị mới
+                                                            slider_rect, handle_rect, confirm_button, cancel_button, fog_checkbox_rect, visibility_value, fog_enabled = draw_po_visibility_selection()
+                                        
+                                        if event.type == pygame.KEYDOWN:
+                                            if event.key == pygame.K_ESCAPE:
+                                                # Hủy và quay lại màn hình chọn thuật toán
+                                                screen.blit(screen_backup, (0, 0))
+                                                pygame.display.flip()
+                                                po_settings_done = False
+                                                break
+                                
+                                if not po_settings_done:
+                                    continue  # Không tiếp tục nếu người dùng hủy
+
                             algorithm_selection = False
                             game_active = True
                             ai_mode = True
-                            hard_mode = False
+
+                            # Khởi tạo giá trị khó dựa theo chọn lựa
+                            difficulty_selection = False
                             
                             if selected_algorithm == "BFS":
                                 ai_function = bfs_algorithm
@@ -1995,12 +2435,27 @@ def main():
                                 ai_function = hill_climbing_algorithm
                             elif selected_algorithm == "Partially Observable":
                                 ai_function = partially_observable_algorithm
+                                # Khởi tạo đầy đủ ai_knowledge với visibility_percentage và fog_enabled
+                                ai_knowledge = {
+                                    "maze": [[None for _ in range(COLS)] for _ in range(ROWS)],
+                                    "probability": [[0.5 for _ in range(COLS)] for _ in range(ROWS)],
+                                    "visited": set(),
+                                    "frontier": set(),
+                                    "princess_found": False,
+                                    "exit_found": False,
+                                    "princess_pos": None,
+                                    "exit_pos": None,
+                                    "princess_rescued": False,
+                                    "exploration_bias": 0.3,
+                                    "visibility_percentage": po_visibility,
+                                    "fog_enabled": po_fog_enabled
+                                }
                             elif selected_algorithm == "Min Conflicts":
                                 ai_function = min_conflicts_algorithm
                             elif selected_algorithm == "Q-Learning":
                                 ai_function = q_learning_algorithm
-                            
-                            ai_knowledge = None
+                            if selected_algorithm != "Partially Observable":
+                                ai_knowledge = None
                             ai_steps = 0
                             ai_deaths = 0
                             break
@@ -2191,7 +2646,14 @@ def main():
 
                 # Vẽ game với sương mù tùy theo chế độ khó/AI
                 screen.fill((20, 20, 20))
-                draw_maze(maze, visible, offset_x, offset_y, player_pos, use_fog=(hard_mode and not ai_mode))
+                use_fog = (hard_mode and not ai_mode)
+                if ai_mode and selected_algorithm == "Partially Observable" and 'ai_knowledge' in locals() and ai_knowledge:
+                    use_fog = ai_knowledge.get("fog_enabled", True)
+                    
+                draw_maze(maze, visible, offset_x, offset_y, player_pos, use_fog=use_fog, 
+                        ai_mode=ai_mode, selected_algorithm=selected_algorithm if ai_mode else None, 
+                        ai_knowledge=ai_knowledge if 'ai_knowledge' in locals() else None)
+                
                 draw_entities(player_pos, princess_pos, ghost_pos, target_pos, visible, offset_x, offset_y)
 
                 # UI
