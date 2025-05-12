@@ -1,5 +1,6 @@
 # Rescue-Princess-AI
 Đồ án cuối kì môn Trí tuệ nhân tạo Trường Đại học Sư phạm kỹ thuật TP. HCM 
+
 **Nhóm sinh viên thực hiện:**
 
 23110225 - Nguyễn Lâm Huy
@@ -89,7 +90,7 @@ python game.py
 
 ```
 Rescue-Princess/
-│           # Thuật toán AI
+│
 ├── game.py              # Khởi chạy game
 ├── maps.txt             # Danh sách bản đồ mê cung
 ├── player_scores.txt      # Bảng điểm người chơi
