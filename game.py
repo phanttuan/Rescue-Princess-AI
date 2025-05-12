@@ -2492,8 +2492,8 @@ def main():
             last_monster_move = pygame.time.get_ticks()
             visible = [[False for _ in range(COLS)] for _ in range(ROWS)]
             
-            # Trong chế độ dễ, hiển thị toàn bộ map
-            if not hard_mode:
+            # Hiển thị toàn bộ map trong chế độ dễ hoặc khi AI không phải PO
+            if not hard_mode or (ai_mode and selected_algorithm != "Partially Observable"):
                 visible = [[True for _ in range(COLS)] for _ in range(ROWS)]
             else:
                 update_visible_area(visible, player_pos)

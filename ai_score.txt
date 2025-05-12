@@ -6,3 +6,5 @@ Serpentine Challenge,Min Conflicts,EASY,43,8,1
 Serpentine Challenge,Q-Learning,EASY,43,8,1
 Map moi,Hill Climbing,EASY,10,2,1
 Serpentine Challenge,Partially Observable,EASY,106,21,0
+Serpentine Challenge,BFS,HARD,45,9,1
+Serpentine Challenge,A*,HARD,43,8,1
