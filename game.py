@@ -444,7 +444,7 @@ def draw_play_mode_selection():
 def draw_ai_algorithm_selection():
     screen.blit(background_img, (0, 0))
     draw_animated_title("Select AI Algorithm", HEIGHT//10)
-    algorithms = ["BFS", "A*", "Hill Climbing", "Partially Observable", "Min Conflicts", "Q-Learning"]
+    algorithms = ["BFS", "A*", "Simple Hill Climbing", "Partially Observable", "Min Conflicts", "Q-Learning"]
     # 7 sắc cầu vồng (đỏ, cam, vàng, lục, lam, chàm, tím)
     rainbow_colors = [
         (255, 60, 60),    # Red
@@ -502,7 +502,6 @@ def bfs_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge
         current = queue.popleft()
         
         if current == goal:
-            # Xây dựng đường đi
             path = []
             while current != player_pos:
                 path.append(current)
@@ -618,8 +617,8 @@ def astar_search(maze, start, goal):
 def manhattan_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-# Hill Climbing Algorithm
-def hill_climbing_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
+#  Simple Hill Climbing Algorithm
+def simple_hill_climbing_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge=None):
     if knowledge is None:
         knowledge = {
             "princess_rescued": False,
@@ -649,34 +648,35 @@ def hill_climbing_algorithm(maze, player_pos, princess_pos, target_pos, visible,
             if maze[new_pos[0]][new_pos[1]] != 1:
                 # Tính khoảng cách mới đến mục tiêu
                 new_distance = manhattan_distance(new_pos, goal)
-                # Thêm vào danh sách với khoảng cách
+                
+                # Chọn ngay bước đi đầu tiên cải thiện khoảng cách
+                if new_distance < current_distance:
+                    return new_pos, knowledge
+                
+                # Thêm vào danh sách với khoảng cách (để dùng khi bị kẹt)
                 possible_moves.append((new_pos, new_distance))
     
+    # Nếu không tìm được bước đi nào tốt hơn
     if possible_moves:
-        # Sắp xếp theo khoảng cách đến mục tiêu (tăng dần)
-        possible_moves.sort(key=lambda x: x[1])
-        best_move = possible_moves[0]
+        knowledge["local_minima_count"] += 1
         
-        # Nếu bước đi tốt nhất không cải thiện vị trí hiện tại
-        if best_move[1] >= current_distance:
-            knowledge["local_minima_count"] += 1
-            
-            # Nếu bị kẹt ở local maxima quá nhiều lần
-            if knowledge["local_minima_count"] >= 5:
-                knowledge["local_minima_count"] = 0
-                knowledge["restart_count"] += 1
-                
-                # Nếu đã restart quá nhiều lần, chọn bước đi ngẫu nhiên
-                if knowledge["restart_count"] >= knowledge["max_restarts"]:
-                    return random.choice(possible_moves)[0], knowledge
-                
-                # Chọn bước đi ngẫu nhiên để thoát khỏi local maxima
+        # Nếu bị kẹt ở local maxima quá nhiều lần
+        if knowledge["local_minima_count"] >= 5:
+            knowledge["local_minima_count"] = 0
+            knowledge["restart_count"] += 1
+
+            # Nếu đã restart quá nhiều lần, chọn bước đi ngẫu nhiên
+            if knowledge["restart_count"] >= knowledge["max_restarts"]:
                 return random.choice(possible_moves)[0], knowledge
+            
+            # Chọn bước đi ngẫu nhiên để thoát khỏi local maxima
+            return random.choice(possible_moves)[0], knowledge
         
-        # Trả về bước đi tốt nhất
-        return best_move[0], knowledge
+        # Chọn bước đi có khoảng cách nhỏ nhất trong trường hợp mắc kẹt
+        possible_moves.sort(key=lambda x: x[1])
+        return possible_moves[0][0], knowledge
     
-    # Nếu không có bước đi nào, chọn bước đi ngẫu nhiên
+    # Nếu không có bước đi nào, đứng yên
     return player_pos, knowledge
 
 # Partially Observable 
@@ -2431,8 +2431,8 @@ def main():
                                 ai_function = bfs_algorithm
                             elif selected_algorithm == "A*":
                                 ai_function = astar_algorithm
-                            elif selected_algorithm == "Hill Climbing":
-                                ai_function = hill_climbing_algorithm
+                            elif selected_algorithm == "Simple Hill Climbing":
+                                ai_function = simple_hill_climbing_algorithm
                             elif selected_algorithm == "Partially Observable":
                                 ai_function = partially_observable_algorithm
                                 # Khởi tạo đầy đủ ai_knowledge với visibility_percentage và fog_enabled

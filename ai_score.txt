@@ -8,3 +8,6 @@ Map moi,Hill Climbing,EASY,10,2,1
 Serpentine Challenge,Partially Observable,EASY,106,21,0
 Serpentine Challenge,BFS,HARD,45,9,1
 Serpentine Challenge,A*,HARD,43,8,1
+Treacherous Maze,Hill Climbing,EASY,27,5,1
+Serpentine Challenge,Hill Climbing,EASY,69,13,1
+Serpentine Challenge,Simple Hill Climbing,EASY,69,13,0
