@@ -41,7 +41,7 @@ Dự án xây dựng một trò chơi mê cung (maze game) trong đó **hiệp s
 ![Min Conflicts](assets/min_conflicts.gif)
 
 ### Q-Learning
-!Q-Learning
+![Q-Learning](assets/q_learning.gif)
 
 ## Cài đặt
 
