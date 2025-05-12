@@ -29,13 +29,13 @@ Dự án xây dựng một trò chơi mê cung (maze game) trong đó **hiệp s
 ![BFS Algorithm](assets/bfs.gif)
 
 ### A*
-![A* Algorithm](assets/astar.gif)
+![A* Algorithm](assets/a_star.gif)
 
 ### Simple Hill Climbing
-![Hill Climbing Algorithm](assets/hill_climbing.gif)
+![Hill Climbing Algorithm](assets/simple_hill_climbing.gif)
 
 ### Partially Observable
-![Partially Observable](assets/partially_observable.gif)
+![Partially Observable](assets/po.gif)
 
 ### Min Conflicts
 ![Min Conflicts](assets/min_conflicts.gif)
