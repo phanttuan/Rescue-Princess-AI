@@ -1,0 +1,7 @@
+Algorithm,Avg Steps,Avg Steps to Princess,Avg Steps Finish,Avg Time to Princess,Avg Time to Exit,Avg Total Time,Success Rate
+BFS,2.00,2.00,2.00,0.000,0.000,0.000,0.0%
+A*,27.00,25.00,27.00,0.001,0.000,0.001,100.0%
+Simple Hill Climbing,27.00,25.00,27.00,0.000,0.000,0.000,100.0%
+Partially Observable,28.80,26.80,28.80,0.011,0.001,0.012,100.0%
+Min Conflicts,27.00,25.00,27.00,0.001,0.000,0.001,100.0%
+Q-Learning,170.10,169.10,170.10,0.007,0.000,0.007,50.0%
