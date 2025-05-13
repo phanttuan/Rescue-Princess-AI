@@ -136,10 +136,19 @@ def calc_stats(results):
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def normalize_map_name(map_name):
+    # Loại bỏ dấu cách và ký tự đặc biệt, thay bằng _
+    return map_name.replace(" ", "_")
+
 def save_stats_csv(stats, map_name):
+    import glob
     folder = os.path.join(BASE_DIR, "benchmark")
     os.makedirs(folder, exist_ok=True)
-    filename = os.path.join(folder, f"benchmark_stats_{map_name}_{int(time.time())}.csv")
+    # Xóa file cũ nếu đã tồn tại
+    pattern = os.path.join(folder, f"benchmark_stats_{map_name}.csv")
+    for f in glob.glob(pattern):
+        os.remove(f)
+    filename = os.path.join(folder, f"benchmark_stats_{map_name}.csv")
     with open(filename, "w", newline='') as f:
         writer = csv.writer(f)
         writer.writerow([
@@ -155,9 +164,14 @@ def save_stats_csv(stats, map_name):
 
 def save_stats_plot(stats, map_name):
     import numpy as np
+    import glob
     folder = os.path.join(BASE_DIR, "benchmark")
     os.makedirs(folder, exist_ok=True)
-    filename = os.path.join(folder, f"benchmark_stats_{map_name}_{int(time.time())}.png")
+    safe_map_name = normalize_map_name(map_name)
+    pattern = os.path.join(folder, f"benchmark_stats_{safe_map_name}.png")
+    for f in glob.glob(pattern):
+        os.remove(f)
+    filename = os.path.join(folder, f"benchmark_stats_{safe_map_name}.png")
     algos = list(stats.keys())
     avg_steps = [stats[a]["avg_steps"] for a in algos]
     avg_total_time = [stats[a]["avg_total_time"] for a in algos]
@@ -289,7 +303,11 @@ def main():
                 if 600 <= x <= 850 and 220 <= y <= 290 and stats:
                     save_stats_csv(stats, map_names[selected_map])
                     save_stats_plot(stats, map_names[selected_map])
-                    save_message = "Đã lưu file CSV và ảnh vào benchmark!"
+                    save_message = "Saved successfully!"
+                    # Reset trạng thái để tiếp tục benchmark mới
+                    show_results = False
+                    benchmark_results = []
+                    stats = {}
         pygame.time.delay(50)
 
 if __name__ == "__main__":

@@ -91,6 +91,48 @@ Rescue-Princess-AI/
 └── README.md            # Tài liệu hướng dẫn
 ```
 
+## So sánh thống kê AI giữa các thuật toán và bản đồ
+
+Dự án cung cấp chức năng **benchmark** để so sánh hiệu quả các thuật toán AI trên nhiều bản đồ khác nhau. Sau khi chạy benchmark, hệ thống sẽ tự động lưu lại các biểu đồ thống kê trong thư mục `benchmark/`. Các biểu đồ này giúp trực quan hóa sự khác biệt về số bước đi trung bình, thời gian hoàn thành và tỷ lệ thành công của từng thuật toán trên từng bản đồ.
+
+### Ý nghĩa các chỉ số thống kê:
+- **Avg Steps:** Số bước trung bình để hoàn thành nhiệm vụ.
+- **Avg Steps to Princess:** Số bước trung bình để tìm đến công chúa.
+- **Avg Steps Finish:** Số bước trung bình để hoàn thành bản đồ.
+- **Avg Time to Princess:** Thời gian trung bình tìm đến công chúa.
+- **Avg Time to Exit:** Thời gian trung bình từ công chúa đến cửa thoát.
+- **Avg Total Time:** Tổng thời gian trung bình hoàn thành bản đồ.
+- **Success Rate:** Tỷ lệ thuật toán hoàn thành nhiệm vụ thành công.
+
+### Ví dụ so sánh các thuật toán trên bản đồ "Serpentine Challenge"
+
+![Benchmark Stats on map: Serpentine Challenge](benchmark/benchmark_stats_Serpentine_Challenge.png)
+
+*Biểu đồ trên cho thấy sự khác biệt rõ rệt giữa các thuật toán về số bước đi, thời gian hoàn thành và tỷ lệ thành công trên bản đồ Serpentine Challenge.*
+
+### So sánh trên các bản đồ khác
+
+Bạn có thể chạy benchmark trên nhiều bản đồ khác nhau để đánh giá:
+- Thuật toán nào tối ưu nhất về số bước đi và thời gian?
+- Thuật toán nào ổn định nhất (tỷ lệ thành công cao)?
+- Độ khó của từng bản đồ ảnh hưởng thế nào đến hiệu quả của từng thuật toán?
+
+#### Ví dụ: So sánh trên bản đồ "Treacherous Maze"
+
+![Benchmark Stats on map: Maze Classic](benchmark/benchmark_stats_Treacherous_Maze.png)
+
+#### Ví dụ: So sánh trên bản đồ "Perilous Journey"
+
+![Benchmark Stats on map: Random Labyrinth](benchmark/benchmark_stats_Perilous_Journey.png)
+
+> **Lưu ý:**  
+> - Các file ảnh biểu đồ sẽ tự động sinh ra trong thư mục `benchmark/` mỗi khi bạn chạy benchmark.
+> - Bạn có thể mở các file này để phân tích, báo cáo hoặc trình bày kết quả học tập.
+
+---
+
+*Chức năng thống kê và trực quan hóa giúp bạn dễ dàng đánh giá, lựa chọn thuật toán AI phù hợp cho từng loại mê cung, đồng thời nâng cao hiểu biết về ưu nhược điểm của từng phương pháp tìm kiếm.*
+
 ## Hướng phát triển
 - Mở rộng thêm các thuật toán tìm kiếm nâng cao như Genetic Algorithm, IDA*, hoặc các thuật toán khác.
 - Thêm chức năng tạo bản đồ ngẫu nhiên với độ khó khác nhau.
