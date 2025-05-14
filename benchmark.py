@@ -70,6 +70,17 @@ def run_benchmark(algorithm, map_data, n_runs=3):
                 t_exit = time.time()
                 steps_finish = steps
                 break
+
+            if algorithm[0] == "BFS":
+            # BFS cần biến knowledge được khởi tạo đúng cách
+                if ai_knowledge is None:
+                    ai_knowledge = {
+                        "princess_rescued": False,
+                        "visited": set(),
+                        "path": [],
+                        "current_path_index": 0
+                    }
+
             # PO cần knowledge đặc biệt
             if algorithm[0] == "Partially Observable":
                 if ai_knowledge is None:
@@ -89,7 +100,7 @@ def run_benchmark(algorithm, map_data, n_runs=3):
                     }
             next_pos, ai_knowledge = algorithm[1](maze, player_pos, princess_pos, target_pos, visible, ai_knowledge)
             steps += 1
-            if next_pos == player_pos:
+            if next_pos == player_pos and algorithm[0] != "BFS":
                 break
             player_pos = next_pos
             if player_pos == princess_pos:
@@ -116,13 +127,28 @@ def calc_stats(results):
         if not algo_results:
             continue
         n = len(algo_results)
-        avg_steps = sum(r["steps"] for r in algo_results) / n
-        avg_steps_to_princess = sum(r["steps_to_princess"] for r in algo_results) / n
-        avg_steps_finish = sum(r["steps_finish"] for r in algo_results) / n
-        avg_time_to_princess = sum(r["time_to_princess"] for r in algo_results) / n
-        avg_time_to_exit = sum(r["time_to_exit"] for r in algo_results) / n
-        avg_total_time = sum(r["total_time"] for r in algo_results) / n
-        success_rate = sum(1 for r in algo_results if r["success"]) / n
+        
+        # Kiểm tra xem có kết quả thành công nào không
+        successful_results = [r for r in algo_results if r["success"]]
+        success_rate = len(successful_results) / n if n > 0 else 0
+        
+        # Tính toán chỉ dựa trên các kết quả thành công nếu có
+        if successful_results:
+            avg_steps = sum(r["steps"] for r in successful_results) / len(successful_results)
+            avg_steps_to_princess = sum(r["steps_to_princess"] for r in successful_results) / len(successful_results)
+            avg_steps_finish = sum(r["steps_finish"] for r in successful_results) / len(successful_results)
+            avg_time_to_princess = sum(r["time_to_princess"] for r in successful_results) / len(successful_results)
+            avg_time_to_exit = sum(r["time_to_exit"] for r in successful_results) / len(successful_results)
+            avg_total_time = sum(r["total_time"] for r in successful_results) / len(successful_results)
+        else:
+            # Nếu không có kết quả thành công, sử dụng tất cả kết quả
+            avg_steps = sum(r["steps"] for r in algo_results) / n
+            avg_steps_to_princess = sum(r["steps_to_princess"] for r in algo_results) / n
+            avg_steps_finish = sum(r["steps_finish"] for r in algo_results) / n
+            avg_time_to_princess = sum(r["time_to_princess"] for r in algo_results) / n
+            avg_time_to_exit = sum(r["time_to_exit"] for r in algo_results) / n
+            avg_total_time = sum(r["total_time"] for r in algo_results) / n
+        
         stats[name] = {
             "avg_steps": avg_steps,
             "avg_steps_to_princess": avg_steps_to_princess,

@@ -498,8 +498,10 @@ def bfs_algorithm(maze, player_pos, princess_pos, target_pos, visible, knowledge
     queue = deque([player_pos])
     visited = {player_pos}
     parent = {player_pos: None}
-    
-    while queue:
+
+    found_goal = False
+
+    while queue and not found_goal:
         current = queue.popleft()
         
         if current == goal:

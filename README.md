@@ -80,7 +80,7 @@ python game.py
 ## Cấu trúc dự án
 ```
 Rescue-Princess-AI/
-│
+├── benchmark.py         # Đo hiệu suất của các thuật toán
 ├── game.py              # File chính của trò chơi
 ├── images/              # Thư mục chứa hình ảnh game
 ├── sounds/              # Thư mục chứa âm thanh
